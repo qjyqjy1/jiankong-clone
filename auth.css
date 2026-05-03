@@ -1,0 +1,20 @@
+/* Shared auth styles used by pages that enable auth.js */
+#auth-overlay {
+    font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+#auth-overlay button {
+    transition: all 0.2s ease;
+}
+
+#auth-overlay button:hover {
+    filter: brightness(1.05);
+}
+
+#auth-overlay input::placeholder {
+    color: rgba(148, 163, 184, 0.9);
+}
+
+#auth-overlay input {
+    transition: border-color 0.2s ease, background-color 0.2s ease;
+}

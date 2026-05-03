@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>技能管理 · 小猪智能体面板</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="theme.css?v=20260429">
+    <link rel="stylesheet" href="navbar.css?v=20260429">
+    <link rel="stylesheet" href="auth.css?v=20260429">
+    <style>
+        /* ===== 技能管理页面专属样式 ===== */
+        .skill-toolbar {
+            display: flex; align-items: center; gap: 10px; margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        .skill-search {
+            flex: 1; min-width: 200px;
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 10px; padding: 10px 14px;
+            color: var(--text-primary); font-size: 14px;
+            outline: none; transition: border-color 0.3s;
+        }
+        .skill-search:focus { border-color: var(--accent-1); }
+        .skill-filter {
+            display: flex; gap: 6px; flex-wrap: wrap;
+        }
+        .filter-btn {
+            padding: 6px 14px; border-radius: 8px;
+            background: var(--bg-card); border: 1px solid var(--border);
+            color: var(--text-secondary); font-size: 13px; font-weight: 500;
+            cursor: pointer; transition: all 0.3s;
+        }
+        .filter-btn:hover { border-color: var(--accent-1); color: var(--text-primary); }
+        .filter-btn.active {
+            background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+            border-color: transparent; color: white;
+        }
+
+        /* ===== 技能卡片网格 ===== */
+        .skills-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 12px;
+        }
+        .skill-card {
+            background: var(--bg-card); backdrop-filter: blur(12px);
+            border: 1px solid var(--border); border-radius: 12px;
+            padding: 16px; position: relative; overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        .skill-card::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+            background: linear-gradient(90deg, var(--accent-1), var(--accent-2));
+        }
+        .skill-card:hover {
+            border-color: var(--border-glow); transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+        .skill-card-header {
+            display: flex; align-items: flex-start; gap: 12px; margin-bottom: 10px;
+        }
+        .skill-icon {
+            width: 42px; height: 42px; border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 18px; flex-shrink: 0;
+            background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+            color: white;
+        }
+        .skill-icon.bundled {
+            background: linear-gradient(135deg, var(--accent-5), #fbbf24);
+        }
+        .skill-icon.needs-setup {
+            background: linear-gradient(135deg, #6b7280, #9ca3af);
+        }
+        .skill-card-title {
+            flex: 1; min-width: 0;
+        }
+        .skill-card-title h3 {
+            font-size: 15px; font-weight: 700; color: var(--text-primary);
+            margin-bottom: 3px; word-break: break-word;
+        }
+        .skill-card-title .skill-source {
+            font-size: 11px; color: var(--text-muted);
+            display: flex; align-items: center; gap: 4px;
+        }
+        .skill-status-badge {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 600;
+        }
+        .status-ready {
+            background: rgba(16, 185, 129, 0.12); color: var(--accent-4);
+        }
+        .status-needs-setup {
+            background: rgba(245, 158, 11, 0.12); color: var(--accent-5);
+        }
+        .status-disabled {
+            background: rgba(107, 114, 128, 0.12); color: #9ca3af;
+        }
+        .skill-desc {
+            font-size: 13px; color: var(--text-secondary); line-height: 1.5;
+            margin-bottom: 12px; display: -webkit-box; -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical; overflow: hidden;
+        }
+        .skill-card-footer {
+            display: flex; align-items: center; justify-content: space-between;
+            padding-top: 10px; border-top: 1px solid var(--border);
+        }
+        .skill-tags {
+            display: flex; gap: 6px; flex-wrap: wrap;
+        }
+        .skill-tag {
+            padding: 2px 8px; border-radius: 4px; font-size: 11px;
+            background: rgba(255,255,255,0.05); color: var(--text-muted);
+        }
+        .skill-actions {
+            display: flex; gap: 6px;
+        }
+        .skill-action-btn {
+            width: 32px; height: 32px; border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            border: 1px solid var(--border); background: transparent;
+            color: var(--text-secondary); font-size: 12px;
+            cursor: pointer; transition: all 0.3s;
+        }
+        .skill-action-btn:hover {
+            border-color: var(--accent-1); color: var(--accent-1);
+            background: rgba(99,102,241,0.08);
+        }
+        .skill-action-btn.danger:hover {
+            border-color: var(--accent-6); color: var(--accent-6);
+            background: rgba(239,68,68,0.08);
+        }
+
+        /* ===== 技能详情弹窗 ===== */
+        .skill-detail-modal {
+            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 2000; align-items: center; justify-content: center;
+        }
+        .skill-detail-modal.show { display: flex; }
+        .modal-overlay {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.88); backdrop-filter: blur(12px);
+        }
+        .modal-detail {
+            position: relative; z-index: 1;
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 16px; width: 90%; max-width: 680px;
+            max-height: 85vh; overflow-y: auto;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.3);
+        }
+        .modal-detail-header {
+            padding: 20px 24px; border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; gap: 16px;
+            background: rgba(255,255,255,0.02);
+        }
+        .modal-detail-icon {
+            width: 52px; height: 52px; border-radius: 14px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 22px; flex-shrink: 0;
+            background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+            color: white;
+        }
+        .modal-detail-title h2 {
+            font-size: 18px; font-weight: 700; color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+        .modal-detail-title .modal-subtitle {
+            font-size: 13px; color: var(--text-muted);
+            display: flex; align-items: center; gap: 8px;
+        }
+        .modal-detail-body {
+            padding: 20px 24px;
+        }
+        .detail-section {
+            margin-bottom: 20px;
+        }
+        .detail-section-title {
+            font-size: 13px; font-weight: 700; color: var(--accent-1);
+            text-transform: uppercase; letter-spacing: 0.5px;
+            margin-bottom: 10px; display: flex; align-items: center; gap: 6px;
+        }
+        .detail-section-title::after {
+            content: ''; flex: 1; height: 1px; background: var(--border);
+        }
+        .detail-row {
+            display: flex; align-items: flex-start; padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+        }
+        .detail-row:last-child { border-bottom: none; }
+        .detail-label {
+            width: 100px; flex-shrink: 0;
+            font-size: 13px; color: var(--text-muted);
+            display: flex; align-items: center; gap: 6px;
+        }
+        .detail-value {
+            flex: 1; font-size: 13px; color: var(--text-primary);
+            word-break: break-all;
+        }
+        .detail-desc-full {
+            font-size: 14px; color: var(--text-secondary); line-height: 1.7;
+        }
+        .missing-item {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 3px 8px; border-radius: 4px; font-size: 12px;
+            background: rgba(239,68,68,0.1); color: var(--accent-6);
+            margin: 2px;
+        }
+        .modal-detail-footer {
+            padding: 16px 24px; border-top: 1px solid var(--border);
+            display: flex; align-items: center; justify-content: flex-end; gap: 10px;
+            background: rgba(255,255,255,0.02);
+        }
+
+        /* ===== 安装技能弹窗 ===== */
+        .install-modal {
+            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 2000; align-items: center; justify-content: center;
+        }
+        .install-modal.show { display: flex; }
+        .install-form {
+            padding: 24px;
+        }
+        .form-group {
+            margin-bottom: 16px;
+        }
+        .form-label {
+            display: block; font-size: 13px; font-weight: 600;
+            color: var(--text-secondary); margin-bottom: 6px;
+        }
+        .form-input {
+            width: 100%; padding: 10px 14px;
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 10px; color: var(--text-primary);
+            font-size: 14px; outline: none; transition: border-color 0.3s;
+        }
+        .form-input:focus { border-color: var(--accent-1); }
+        .form-hint {
+            font-size: 12px; color: var(--text-muted); margin-top: 4px;
+        }
+
+        /* ===== 空状态 ===== */
+        .empty-state {
+            text-align: center; padding: 60px 20px; color: var(--text-muted);
+        }
+        .empty-state i { font-size: 48px; margin-bottom: 16px; opacity: 0.3; }
+        .empty-state p { font-size: 14px; }
+
+        /* ===== 加载状态 ===== */
+        .loading-state {
+            text-align: center; padding: 40px; color: var(--text-muted);
+        }
+        .loading-state i { font-size: 24px; margin-bottom: 8px; }
+
+        /* ===== Toast 通知 ===== */
+        .toast-container {
+            position: fixed; top: 80px; right: 20px; z-index: 3000;
+            display: flex; flex-direction: column; gap: 8px;
+        }
+        .toast {
+            padding: 12px 20px; border-radius: 10px;
+            font-size: 14px; font-weight: 500;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            animation: toastIn 0.3s ease; min-width: 260px;
+            display: flex; align-items: center; gap: 10px;
+        }
+        .toast.success { background: linear-gradient(135deg, #10b981, #34d399); color: white; }
+        .toast.error { background: linear-gradient(135deg, #ef4444, #dc2626); color: white; }
+        .toast.info { background: linear-gradient(135deg, var(--accent-1), var(--accent-2)); color: white; }
+        @keyframes toastIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* ===== 确认弹窗 ===== */
+        .confirm-modal {
+            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 2000; align-items: center; justify-content: center;
+        }
+        .confirm-modal.show { display: flex; }
+        .confirm-box {
+            position: relative; z-index: 1;
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 16px; padding: 24px; width: 90%; max-width: 420px;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.3);
+        }
+        .confirm-box h3 {
+            font-size: 16px; font-weight: 700; color: var(--text-primary);
+            margin-bottom: 8px; display: flex; align-items: center; gap: 8px;
+        }
+        .confirm-box p { font-size: 14px; color: var(--text-secondary); margin-bottom: 20px; }
+        .confirm-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+        /* ===== 响应式 ===== */
+        @media (max-width: 768px) {
+            .skills-grid { grid-template-columns: 1fr; }
+            .skill-toolbar { flex-direction: column; align-items: stretch; }
+            .skill-filter { justify-content: center; }
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <div id="navbar-container"></div>
+
+    <!-- 主容器 -->
+    <div class="main-container">
+        <!-- 统计卡片 -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" id="stat-total-skills">--</div>
+                <div class="stat-label"><i class="fas fa-cubes"></i> 总技能数</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-ready-skills">--</div>
+                <div class="stat-label"><i class="fas fa-check-circle"></i> 已就绪</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-needs-setup">--</div>
+                <div class="stat-label"><i class="fas fa-exclamation-triangle"></i> 需配置</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-bundled">--</div>
+                <div class="stat-label"><i class="fas fa-box"></i> 内置技能</div>
+            </div>
+        </div>
+
+        <!-- 工具栏 -->
+        <div class="skill-toolbar">
+            <input type="text" class="skill-search" id="skillSearch" placeholder="🔍 搜索技能名称或描述...">
+            <div class="skill-filter">
+                <button class="filter-btn active" data-filter="all">全部</button>
+                <button class="filter-btn" data-filter="ready">已就绪</button>
+                <button class="filter-btn" data-filter="needs-setup">需配置</button>
+                <button class="filter-btn" data-filter="bundled">内置</button>
+                <button class="filter-btn" data-filter="workspace">工作区</button>
+            </div>
+            <button class="btn btn-primary" onclick="openInstallModal()">
+                <i class="fas fa-plus"></i> 安装技能
+            </button>
+            <button class="btn btn-ghost" onclick="refreshSkills()">
+                <i class="fas fa-sync-alt"></i> 刷新
+            </button>
+        </div>
+
+        <!-- 技能列表 -->
+        <div id="skillsContainer">
+            <div class="loading-state"><i class="fas fa-spinner fa-spin"></i><p>正在加载技能列表...</p></div>
+        </div>
+    </div>
+
+    <!-- 技能详情弹窗 -->
+    <div class="skill-detail-modal" id="detailModal">
+        <div class="modal-overlay" onclick="closeDetailModal()"></div>
+        <div class="modal-detail">
+            <div class="modal-detail-header">
+                <div class="modal-detail-icon" id="detailIcon">📦</div>
+                <div class="modal-detail-title">
+                    <h2 id="detailName">--</h2>
+                    <div class="modal-subtitle">
+                        <span id="detailSource">--</span>
+                        <span id="detailStatus">--</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-detail-body">
+                <div class="detail-section">
+                    <div class="detail-section-title"><i class="fas fa-align-left"></i> 描述</div>
+                    <div class="detail-desc-full" id="detailDesc">--</div>
+                </div>
+                <div class="detail-section">
+                    <div class="detail-section-title"><i class="fas fa-info-circle"></i> 详细信息</div>
+                    <div id="detailInfo"></div>
+                </div>
+                <div class="detail-section" id="missingSection" style="display:none">
+                    <div class="detail-section-title"><i class="fas fa-exclamation-circle"></i> 缺少的依赖</div>
+                    <div id="detailMissing"></div>
+                </div>
+            </div>
+            <div class="modal-detail-footer">
+                <button class="btn btn-ghost" onclick="closeDetailModal()">
+                    <i class="fas fa-times"></i> 关闭
+                </button>
+                <button class="btn btn-danger" id="detailUninstallBtn" onclick="confirmUninstall()">
+                    <i class="fas fa-trash"></i> 卸载技能
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 安装技能弹窗 -->
+    <div class="install-modal" id="installModal">
+        <div class="modal-overlay" onclick="closeInstallModal()"></div>
+        <div class="modal-detail" style="max-width:500px">
+            <div class="modal-detail-header">
+                <div class="modal-detail-icon"><i class="fas fa-download"></i></div>
+                <div class="modal-detail-title">
+                    <h2>安装技能</h2>
+                    <div class="modal-subtitle">从 ClawHub 安装新技能</div>
+                </div>
+            </div>
+            <div class="install-form">
+                <div class="form-group">
+                    <label class="form-label">技能 Slug</label>
+                    <input type="text" class="form-input" id="installSlug" placeholder="例如: find-skills">
+                    <div class="form-hint">输入 ClawHub 上的技能标识符</div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">版本（可选）</label>
+                    <input type="text" class="form-input" id="installVersion" placeholder="留空安装最新版本">
+                    <div class="form-hint">指定版本号如 1.2.0，留空安装最新</div>
+                </div>
+            </div>
+            <div class="modal-detail-footer">
+                <button class="btn btn-ghost" onclick="closeInstallModal()">
+                    <i class="fas fa-times"></i> 取消
+                </button>
+                <button class="btn btn-primary" onclick="installSkill()">
+                    <i class="fas fa-download"></i> 安装
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 确认弹窗 -->
+    <div class="confirm-modal" id="confirmModal">
+        <div class="modal-overlay" onclick="closeConfirmModal()"></div>
+        <div class="confirm-box">
+            <h3><i class="fas fa-exclamation-triangle" style="color:var(--accent-5)"></i> <span id="confirmTitle">确认操作</span></h3>
+            <p id="confirmMessage">确定要执行此操作吗？</p>
+            <div class="confirm-actions">
+                <button class="btn btn-ghost" onclick="closeConfirmModal()">取消</button>
+                <button class="btn btn-danger" id="confirmBtn" onclick="executeConfirm()">
+                    <i class="fas fa-check"></i> 确认
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast 容器 -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="auth.js?v=20260429"></script>
+    <script src="navbar.js?v=20260429"></script>
+    <script>
+        // ===== API配置 =====
+        const API_HOST = window.location.origin;
+
+        // ===== 技能数据 =====
+        let allSkills = [];
+        let currentFilter = 'all';
+        let currentSearch = '';
+        let selectedSkill = null;
+        let confirmCallback = null;
+
+        // ===== 初始化 =====
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSkills();
+            setupFilters();
+            setupSearch();
+        });
+
+        // ===== 加载技能列表 =====
+        async function loadSkills() {
+            try {
+                const resp = await fetch(API_HOST + '/api/skills');
+                const data = await resp.json();
+                allSkills = data.skills || [];
+                renderSkills();
+                updateStats();
+            } catch (e) {
+                document.getElementById('skillsContainer').innerHTML =
+                    '<div class="empty-state"><i class="fas fa-exclamation-circle"></i><p>加载失败: ' + escapeHtml(e.message) + '</p></div>';
+            }
+        }
+
+        // ===== 刷新技能列表 =====
+        function refreshSkills() {
+            requireAuth(function() {
+                document.getElementById('skillsContainer').innerHTML =
+                    '<div class="loading-state"><i class="fas fa-spinner fa-spin"></i><p>正在刷新技能列表...</p></div>';
+                loadSkills();
+                showToast('技能列表已刷新', 'success');
+            });
+        }
+
+        // ===== 更新统计 =====
+        function updateStats() {
+            const total = allSkills.length;
+            const ready = allSkills.filter(s => s.eligible && !s.disabled).length;
+            const needsSetup = allSkills.filter(s => !s.eligible && !s.disabled).length;
+            const bundled = allSkills.filter(s => s.bundled).length;
+            document.getElementById('stat-total-skills').textContent = total;
+            document.getElementById('stat-ready-skills').textContent = ready;
+            document.getElementById('stat-needs-setup').textContent = needsSetup;
+            document.getElementById('stat-bundled').textContent = bundled;
+        }
+
+        // ===== 渲染技能列表 =====
+        function renderSkills() {
+            let filtered = allSkills;
+
+            // 过滤
+            if (currentFilter === 'ready') filtered = filtered.filter(s => s.eligible && !s.disabled);
+            else if (currentFilter === 'needs-setup') filtered = filtered.filter(s => !s.eligible && !s.disabled);
+            else if (currentFilter === 'bundled') filtered = filtered.filter(s => s.bundled);
+            else if (currentFilter === 'workspace') filtered = filtered.filter(s => !s.bundled);
+
+            // 搜索
+            if (currentSearch) {
+                const q = currentSearch.toLowerCase();
+                filtered = filtered.filter(s =>
+                    (s.name && s.name.toLowerCase().includes(q)) ||
+                    (s.description && s.description.toLowerCase().includes(q))
+                );
+            }
+
+            const container = document.getElementById('skillsContainer');
+            if (filtered.length === 0) {
+                container.innerHTML = '<div class="empty-state"><i class="fas fa-search"></i><p>没有找到匹配的技能</p></div>';
+                return;
+            }
+
+            let html = '<div class="skills-grid">';
+            filtered.forEach(skill => {
+                html += renderSkillCard(skill);
+            });
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        // ===== 渲染单个技能卡片 =====
+        function renderSkillCard(skill) {
+            const emoji = skill.emoji || '📦';
+            const isReady = skill.eligible && !skill.disabled;
+            const isBundled = skill.bundled;
+            const iconClass = isBundled ? 'bundled' : (!isReady ? 'needs-setup' : '');
+            const statusClass = isReady ? 'status-ready' : (skill.disabled ? 'status-disabled' : 'status-needs-setup');
+            const statusText = isReady ? '✓ 已就绪' : (skill.disabled ? '✕ 已禁用' : '△ 需配置');
+
+            let tags = [];
+            if (isBundled) tags.push('<span class="skill-tag">内置</span>');
+            else tags.push('<span class="skill-tag">工作区</span>');
+            const hiddenSources = ['codex-bundled', 'codex-workspace'];
+            if (skill.source && !hiddenSources.includes(skill.source)) {
+                tags.push('<span class="skill-tag">' + escapeHtml(skill.source) + '</span>');
+            }
+
+            return `<div class="skill-card">
+                <div class="skill-card-header">
+                    <div class="skill-icon ${iconClass}">${emoji}</div>
+                    <div class="skill-card-title">
+                        <h3>${escapeHtml(skill.name)}</h3>
+                        <div class="skill-source"><i class="fas fa-folder"></i> ${escapeHtml(skill.source || 'unknown')}</div>
+                    </div>
+                    <span class="skill-status-badge ${statusClass}">${statusText}</span>
+                </div>
+                <div class="skill-desc">${escapeHtml(skill.description || '暂无描述')}</div>
+                <div class="skill-card-footer">
+                    <div class="skill-tags">${tags.join('')}</div>
+                    <div class="skill-actions">
+                        <button class="skill-action-btn" onclick='showSkillDetail(${jsArg(skill.name)})' title="查看详情">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        ${!isBundled ? `<button class="skill-action-btn danger" onclick='confirmUninstallSkill(${jsArg(skill.name)})' title="卸载">
+                            <i class="fas fa-trash"></i>
+                        </button>` : ''}
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        // ===== 筛选按钮 =====
+        function setupFilters() {
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    currentFilter = this.dataset.filter;
+                    renderSkills();
+                });
+            });
+        }
+
+        // ===== 搜索框 =====
+        function setupSearch() {
+            const input = document.getElementById('skillSearch');
+            let timer;
+            input.addEventListener('input', function() {
+                clearTimeout(timer);
+                timer = setTimeout(() => {
+                    currentSearch = this.value.trim();
+                    renderSkills();
+                }, 300);
+            });
+        }
+
+        // ===== 技能详情 =====
+        function showSkillDetail(name) {
+            const skill = allSkills.find(s => s.name === name);
+            if (!skill) return;
+            selectedSkill = skill;
+
+            document.getElementById('detailIcon').textContent = skill.emoji || '📦';
+            document.getElementById('detailName').textContent = skill.name;
+            document.getElementById('detailSource').textContent = skill.source || 'unknown';
+            document.getElementById('detailDesc').textContent = skill.description || '暂无描述';
+
+            const isReady = skill.eligible && !skill.disabled;
+            const statusEl = document.getElementById('detailStatus');
+            statusEl.innerHTML = isReady
+                ? '<span class="skill-status-badge status-ready">✓ 已就绪</span>'
+                : '<span class="skill-status-badge status-needs-setup">△ 需配置</span>';
+
+            // 详细信息
+            let infoHtml = '';
+            infoHtml += `<div class="detail-row"><span class="detail-label"><i class="fas fa-fingerprint"></i> Slug</span><span class="detail-value">${escapeHtml(skill.name)}</span></div>`;
+            infoHtml += `<div class="detail-row"><span class="detail-label"><i class="fas fa-box"></i> 来源</span><span class="detail-value">${escapeHtml(skill.source || '--')}</span></div>`;
+            infoHtml += `<div class="detail-row"><span class="detail-label"><i class="fas fa-star"></i> 状态</span><span class="detail-value">${isReady ? '已就绪' : '需配置'}</span></div>`;
+            if (skill.homepage) {
+                infoHtml += `<div class="detail-row"><span class="detail-label"><i class="fas fa-link"></i> 主页</span><span class="detail-value"><a href="${escapeHtml(skill.homepage)}" target="_blank" style="color:var(--accent-1)">${escapeHtml(skill.homepage)}</a></span></div>`;
+            }
+            document.getElementById('detailInfo').innerHTML = infoHtml;
+
+            // 缺少依赖
+            const missing = skill.missing || {};
+            const hasMissing = (missing.bins && missing.bins.length) || (missing.env && missing.env.length) || (missing.config && missing.config.length) || (missing.os && missing.os.length);
+            if (hasMissing) {
+                document.getElementById('missingSection').style.display = 'block';
+                let missHtml = '';
+                if (missing.bins) missing.bins.forEach(b => { missHtml += `<span class="missing-item"><i class="fas fa-terminal"></i> ${escapeHtml(b)}</span>`; });
+                if (missing.env) missing.env.forEach(e => { missHtml += `<span class="missing-item"><i class="fas fa-key"></i> ${escapeHtml(e)}</span>`; });
+                if (missing.config) missing.config.forEach(c => { missHtml += `<span class="missing-item"><i class="fas fa-cog"></i> ${escapeHtml(c)}</span>`; });
+                if (missing.os) missing.os.forEach(o => { missHtml += `<span class="missing-item"><i class="fas fa-desktop"></i> ${escapeHtml(o)}</span>`; });
+                document.getElementById('detailMissing').innerHTML = missHtml;
+            } else {
+                document.getElementById('missingSection').style.display = 'none';
+            }
+
+            // 卸载按钮：内置技能不允许卸载
+            const uninstallBtn = document.getElementById('detailUninstallBtn');
+            if (skill.bundled) {
+                uninstallBtn.style.display = 'none';
+            } else {
+                uninstallBtn.style.display = 'inline-flex';
+            }
+
+            document.getElementById('detailModal').classList.add('show');
+        }
+
+        function closeDetailModal() {
+            document.getElementById('detailModal').classList.remove('show');
+            selectedSkill = null;
+        }
+
+        // ===== 安装技能 =====
+        function openInstallModal() {
+            requireAuth(function() {
+                document.getElementById('installSlug').value = '';
+                document.getElementById('installVersion').value = '';
+                document.getElementById('installModal').classList.add('show');
+            });
+        }
+
+        function closeInstallModal() {
+            document.getElementById('installModal').classList.remove('show');
+        }
+
+        async function installSkill() {
+            const slug = document.getElementById('installSlug').value.trim();
+            const version = document.getElementById('installVersion').value.trim();
+            if (!slug) {
+                showToast('请输入技能 Slug', 'error');
+                return;
+            }
+
+            closeInstallModal();
+            showToast('正在安装 ' + slug + '...', 'info');
+
+            try {
+                let url = API_HOST + '/api/skills/install?slug=' + encodeURIComponent(slug);
+                if (version) url += '&version=' + encodeURIComponent(version);
+                const resp = await fetch(url);
+                const data = await resp.json();
+                if (data.success) {
+                    showToast('技能 ' + slug + ' 安装成功！', 'success');
+                    loadSkills();
+                } else {
+                    showToast('安装失败: ' + (data.error || '未知错误'), 'error');
+                }
+            } catch (e) {
+                showToast('安装失败: ' + e.message, 'error');
+            }
+        }
+
+        // ===== 卸载技能 =====
+        function confirmUninstallSkill(name) {
+            requireAuth(function() {
+                showConfirm('卸载技能', '确定要卸载技能「' + name + '」吗？此操作不可撤销。', function() {
+                    doUninstall(name);
+                });
+            });
+        }
+
+        function confirmUninstall() {
+            if (!selectedSkill) return;
+            requireAuth(function() {
+                closeDetailModal();
+                showConfirm('卸载技能', '确定要卸载技能「' + selectedSkill.name + '」吗？此操作不可撤销。', function() {
+                    doUninstall(selectedSkill.name);
+                });
+            });
+        }
+
+        async function doUninstall(name) {
+            showToast('正在卸载 ' + name + '...', 'info');
+            try {
+                const resp = await fetch(API_HOST + '/api/skills/uninstall?slug=' + encodeURIComponent(name));
+                const data = await resp.json();
+                if (data.success) {
+                    showToast('技能 ' + name + ' 已卸载', 'success');
+                    loadSkills();
+                } else {
+                    showToast('卸载失败: ' + (data.error || '未知错误'), 'error');
+                }
+            } catch (e) {
+                showToast('卸载失败: ' + e.message, 'error');
+            }
+        }
+
+        // ===== 确认弹窗 =====
+        function showConfirm(title, message, callback) {
+            document.getElementById('confirmTitle').textContent = title;
+            document.getElementById('confirmMessage').textContent = message;
+            confirmCallback = callback;
+            document.getElementById('confirmModal').classList.add('show');
+        }
+
+        function closeConfirmModal() {
+            document.getElementById('confirmModal').classList.remove('show');
+            confirmCallback = null;
+        }
+
+        function executeConfirm() {
+            if (confirmCallback) confirmCallback();
+            closeConfirmModal();
+        }
+
+        // ===== Toast 通知 =====
+        function showToast(message, type) {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = 'toast ' + type;
+            toast.innerHTML = '<i class="fas fa-' + (type === 'success' ? 'check-circle' : (type === 'error' ? 'times-circle' : 'info-circle')) + '"></i> ' + escapeHtml(message);
+            container.appendChild(toast);
+            setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 3500);
+        }
+
+        // ===== 工具函数 =====
+        function escapeHtml(str) {
+            if (!str) return '';
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        function jsArg(value) {
+            return JSON.stringify(value == null ? '' : String(value))
+                .replace(/</g, '\\u003c')
+                .replace(/>/g, '\\u003e')
+                .replace(/&/g, '\\u0026');
+        }
+
+        // ===== 键盘事件 =====
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeDetailModal();
+                closeInstallModal();
+                closeConfirmModal();
+            }
+        });
+    </script>
+</body>
+</html>

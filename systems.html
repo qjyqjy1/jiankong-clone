@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能系统 · 小猪智能体面板</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="theme.css?v=20260429">
+    <link rel="stylesheet" href="navbar.css?v=20260429">
+    <link rel="stylesheet" href="auth.css?v=20260429">
+    <style>
+        /* ===== 系统总览 ===== */
+        .system-overview {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 12px; margin-bottom: 20px;
+        }
+        .sys-card {
+            background: var(--bg-card); backdrop-filter: blur(12px);
+            border: 1px solid var(--border); border-radius: 12px;
+            padding: 18px; position: relative; overflow: hidden;
+            transition: all 0.3s ease; cursor: default;
+        }
+        .sys-card::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+        }
+        .sys-card:hover {
+            border-color: var(--border-glow); transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+        }
+        .sys-card-header {
+            display: flex; align-items: center; gap: 12px; margin-bottom: 12px;
+        }
+        .sys-card-icon {
+            width: 44px; height: 44px; border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 18px; flex-shrink: 0; color: white;
+        }
+        .sys-card-info h3 {
+            font-size: 15px; font-weight: 700; color: var(--text-primary);
+            margin-bottom: 2px;
+        }
+        .sys-card-info .sys-type {
+            font-size: 12px; color: var(--text-muted);
+        }
+        .sys-card-desc {
+            font-size: 13px; color: var(--text-secondary); line-height: 1.5;
+            margin-bottom: 12px;
+        }
+        .sys-card-meta {
+            display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;
+        }
+        .sys-meta-item {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 3px 8px; border-radius: 6px; font-size: 11px;
+            background: rgba(255,255,255,0.04); color: var(--text-muted);
+        }
+        .sys-meta-item i { font-size: 10px; }
+        .sys-card-actions {
+            display: flex; gap: 6px; flex-wrap: wrap;
+        }
+        .sys-action-btn {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 5px 12px; border-radius: 8px;
+            font-size: 12px; font-weight: 600;
+            border: 1px solid var(--border); background: transparent;
+            color: var(--text-secondary); cursor: pointer;
+            transition: all 0.3s;
+        }
+        .sys-action-btn:hover {
+            border-color: var(--accent-1); color: var(--accent-1);
+            background: rgba(99,102,241,0.06);
+        }
+        .sys-action-btn.success:hover {
+            border-color: var(--accent-4); color: var(--accent-4);
+            background: rgba(16,185,129,0.06);
+        }
+        .sys-action-btn.warning:hover {
+            border-color: var(--accent-5); color: var(--accent-5);
+            background: rgba(245,158,11,0.06);
+        }
+        .sys-action-btn.danger:hover {
+            border-color: var(--accent-6); color: var(--accent-6);
+            background: rgba(239,68,68,0.06);
+        }
+
+        /* ===== 分组标题 ===== */
+        .section-header {
+            display: flex; align-items: center; gap: 10px;
+            margin: 24px 0 12px; padding-bottom: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+        .section-header h2 {
+            font-size: 16px; font-weight: 700; color: var(--text-primary);
+            display: flex; align-items: center; gap: 8px;
+        }
+        .section-header h2 i { color: var(--accent-1); font-size: 15px; }
+        .section-header .section-count {
+            font-size: 12px; color: var(--text-muted);
+            background: rgba(255,255,255,0.05);
+            padding: 2px 8px; border-radius: 6px;
+        }
+        .section-header::after {
+            content: ''; flex: 1; height: 1px;
+            background: linear-gradient(90deg, var(--border), transparent);
+            margin-left: 10px;
+        }
+
+        /* ===== 状态指示器 ===== */
+        .status-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            display: inline-block; flex-shrink: 0;
+        }
+        .status-dot.online { background: var(--accent-4); box-shadow: 0 0 6px rgba(16,185,129,0.4); }
+        .status-dot.offline { background: #6b7280; }
+        .status-dot.warning { background: var(--accent-5); }
+        .status-dot.info { background: var(--accent-1); }
+
+        /* ===== 进度条 ===== */
+        .sys-progress {
+            height: 4px; border-radius: 2px;
+            background: rgba(255,255,255,0.06); overflow: hidden;
+            margin-top: 8px;
+        }
+        .sys-progress-bar {
+            height: 100%; border-radius: 2px;
+            transition: width 0.5s ease;
+        }
+
+        /* ===== 服务控制按钮组 ===== */
+        .service-controls {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 12px;
+        }
+        .service-card {
+            background: var(--bg-card); backdrop-filter: blur(12px);
+            border: 1px solid var(--border); border-radius: 12px;
+            padding: 16px; position: relative; overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        .service-card::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+        }
+        .service-card:hover { border-color: var(--border-glow); }
+        .service-top {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .service-title {
+            display: flex; align-items: center; gap: 10px;
+        }
+        .service-icon {
+            width: 36px; height: 36px; border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 15px; color: white; flex-shrink: 0;
+        }
+        .service-name {
+            font-size: 14px; font-weight: 700; color: var(--text-primary);
+        }
+        .service-status {
+            font-size: 12px; font-weight: 600;
+            display: flex; align-items: center; gap: 4px;
+        }
+        .service-status.online { color: var(--accent-4); }
+        .service-status.offline { color: #6b7280; }
+        .service-desc {
+            font-size: 12px; color: var(--text-secondary); line-height: 1.5;
+            margin-bottom: 12px;
+        }
+        .service-info {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+            margin-bottom: 12px;
+        }
+        .service-info-item {
+            font-size: 12px; color: var(--text-muted);
+            display: flex; align-items: center; gap: 4px;
+        }
+        .service-info-item span { color: var(--text-primary); font-weight: 600; }
+        .service-btns {
+            display: flex; gap: 6px; flex-wrap: wrap;
+        }
+
+        /* ===== 项目卡片 ===== */
+        .project-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 12px;
+        }
+        .project-card {
+            background: var(--bg-card); backdrop-filter: blur(12px);
+            border: 1px solid var(--border); border-radius: 12px;
+            padding: 16px; position: relative; overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        .project-card::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+        }
+        .project-card:hover {
+            border-color: var(--border-glow); transform: translateY(-2px);
+        }
+        .project-top {
+            display: flex; align-items: flex-start; gap: 12px; margin-bottom: 10px;
+        }
+        .project-icon {
+            width: 40px; height: 40px; border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px; color: white; flex-shrink: 0;
+        }
+        .project-info h3 {
+            font-size: 14px; font-weight: 700; color: var(--text-primary);
+            margin-bottom: 2px;
+        }
+        .project-info .project-path {
+            font-size: 11px; color: var(--text-muted); font-family: monospace;
+        }
+        .project-desc {
+            font-size: 13px; color: var(--text-secondary); line-height: 1.5;
+            margin-bottom: 10px;
+        }
+        .project-tags {
+            display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px;
+        }
+        .project-tag {
+            padding: 2px 8px; border-radius: 4px; font-size: 11px;
+            background: rgba(255,255,255,0.05); color: var(--text-muted);
+        }
+        .project-footer {
+            display: flex; align-items: center; justify-content: space-between;
+            padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.04);
+        }
+        .project-date {
+            font-size: 11px; color: var(--text-muted);
+        }
+
+        /* ===== 操作日志 ===== */
+        .action-log {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 12px; overflow: hidden;
+        }
+        .action-log-header {
+            padding: 12px 16px; border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; justify-content: space-between;
+            background: rgba(255,255,255,0.02);
+        }
+        .action-log-header h3 {
+            font-size: 14px; font-weight: 700; color: var(--text-primary);
+            display: flex; align-items: center; gap: 8px;
+        }
+        .action-log-header h3 i { color: var(--accent-1); }
+        .action-log-list {
+            max-height: 300px; overflow-y: auto;
+        }
+        .action-log-item {
+            padding: 10px 16px; border-bottom: 1px solid rgba(255,255,255,0.03);
+            display: flex; align-items: center; gap: 10px;
+            font-size: 13px;
+        }
+        .action-log-item:last-child { border-bottom: none; }
+        .action-log-item .log-time {
+            font-size: 11px; color: var(--text-muted); white-space: nowrap;
+            font-family: monospace; min-width: 80px;
+        }
+        .action-log-item .log-icon {
+            width: 24px; height: 24px; border-radius: 6px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 10px; flex-shrink: 0;
+        }
+        .action-log-item .log-msg {
+            flex: 1; color: var(--text-secondary);
+        }
+
+        /* ===== Toast ===== */
+        .toast-container {
+            position: fixed; top: 80px; right: 20px; z-index: 3000;
+            display: flex; flex-direction: column; gap: 8px;
+        }
+        .toast {
+            padding: 12px 20px; border-radius: 10px;
+            font-size: 14px; font-weight: 500;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            animation: toastIn 0.3s ease; min-width: 260px;
+            display: flex; align-items: center; gap: 10px;
+        }
+        .toast.success { background: linear-gradient(135deg, #10b981, #34d399); color: white; }
+        .toast.error { background: linear-gradient(135deg, #ef4444, #dc2626); color: white; }
+        .toast.info { background: linear-gradient(135deg, var(--accent-1), var(--accent-2)); color: white; }
+        .toast.warning { background: linear-gradient(135deg, #f59e0b, #fbbf24); color: #1a1a2e; }
+        @keyframes toastIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* ===== 响应式 ===== */
+        @media (max-width: 768px) {
+            .system-overview { grid-template-columns: 1fr; }
+            .service-controls { grid-template-columns: 1fr; }
+            .project-grid { grid-template-columns: 1fr; }
+            .service-info { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <div id="navbar-container"></div>
+
+    <!-- 主容器 -->
+    <div class="main-container">
+        <!-- 统计卡片 -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" id="stat-systems">--</div>
+                <div class="stat-label"><i class="fas fa-server"></i> 系统服务</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-projects">--</div>
+                <div class="stat-label"><i class="fas fa-folder-tree"></i> 开发项目</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-skills-custom">--</div>
+                <div class="stat-label"><i class="fas fa-puzzle-piece"></i> 自定义技能</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-uptime">--</div>
+                <div class="stat-label"><i class="fas fa-clock"></i> 运行时间</div>
+            </div>
+        </div>
+
+        <!-- 系统服务 -->
+        <div class="section-header">
+            <h2><i class="fas fa-server"></i> 系统服务</h2>
+            <span class="section-count" id="service-count">0 个服务</span>
+        </div>
+        <div class="service-controls" id="serviceList">
+            <div class="loading-state"><i class="fas fa-spinner fa-spin"></i><p>正在加载服务状态...</p></div>
+        </div>
+
+        <!-- 开发项目 -->
+        <div class="section-header">
+            <h2><i class="fas fa-folder-tree"></i> 开发项目</h2>
+            <span class="section-count" id="project-count">0 个项目</span>
+        </div>
+        <div class="project-grid" id="projectList">
+            <div class="loading-state"><i class="fas fa-spinner fa-spin"></i><p>正在加载项目列表...</p></div>
+        </div>
+
+        <!-- 自定义技能 -->
+        <div class="section-header">
+            <h2><i class="fas fa-puzzle-piece"></i> 自定义技能</h2>
+            <span class="section-count" id="skill-count">0 个技能</span>
+        </div>
+        <div class="project-grid" id="skillList">
+            <div class="loading-state"><i class="fas fa-spinner fa-spin"></i><p>正在加载技能列表...</p></div>
+        </div>
+
+        <!-- 操作日志 -->
+        <div class="section-header">
+            <h2><i class="fas fa-clipboard-list"></i> 操作日志</h2>
+        </div>
+        <div class="action-log">
+            <div class="action-log-header">
+                <h3><i class="fas fa-history"></i> 最近操作</h3>
+                <button class="btn btn-ghost btn-sm" onclick="clearActionLog()">
+                    <i class="fas fa-trash"></i> 清空日志
+                </button>
+            </div>
+            <div class="action-log-list" id="actionLogList">
+                <div class="action-log-item"><span class="log-msg" style="color:var(--text-muted)">暂无操作记录</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast 容器 -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="auth.js?v=20260429"></script>
+    <script src="navbar.js?v=20260429"></script>
+    <script>
+        // ===== API配置 =====
+        const API_HOST = window.location.origin;
+
+        // ===== 操作日志 =====
+        let actionLogs = [];
+        try {
+            actionLogs = JSON.parse(localStorage.getItem('nexus_action_logs') || '[]');
+        } catch(e) { actionLogs = []; }
+
+        function addActionLog(action, target, status) {
+            const now = new Date();
+            const time = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const icons = {
+                start: { icon: 'fa-play', color: 'var(--accent-4)' },
+                stop: { icon: 'fa-stop', color: 'var(--accent-6)' },
+                restart: { icon: 'fa-sync-alt', color: 'var(--accent-1)' },
+                status: { icon: 'fa-info-circle', color: 'var(--accent-3)' },
+                open: { icon: 'fa-external-link-alt', color: 'var(--accent-2)' },
+                default: { icon: 'fa-cog', color: 'var(--text-muted)' }
+            };
+            const cfg = icons[action] || icons.default;
+            actionLogs.unshift({ time, action, target, status, icon: cfg.icon, color: cfg.color });
+            if (actionLogs.length > 50) actionLogs = actionLogs.slice(0, 50);
+            localStorage.setItem('nexus_action_logs', JSON.stringify(actionLogs));
+            renderActionLog();
+        }
+
+        function renderActionLog() {
+            const container = document.getElementById('actionLogList');
+            if (actionLogs.length === 0) {
+                container.innerHTML = '<div class="action-log-item"><span class="log-msg" style="color:var(--text-muted)">暂无操作记录</span></div>';
+                return;
+            }
+            container.innerHTML = actionLogs.map(log => {
+                const statusColor = log.status === 'success' ? 'var(--accent-4)' : (log.status === 'error' ? 'var(--accent-6)' : 'var(--accent-5)');
+                const statusIcon = log.status === 'success' ? 'fa-check' : (log.status === 'error' ? 'fa-times' : 'fa-spinner fa-spin');
+                const icon = /^[a-z0-9 -]+$/i.test(log.icon || '') ? log.icon : 'fa-cog';
+                const color = /^var\(--[a-z0-9-]+\)$/i.test(log.color || '') ? log.color : 'var(--text-muted)';
+                return `<div class="action-log-item">
+                    <span class="log-time">${escapeHtml(log.time)}</span>
+                    <span class="log-icon" style="background:${color}20;color:${color}"><i class="fas ${icon}"></i></span>
+                    <span class="log-msg">${escapeHtml(log.target)}</span>
+                    <span style="color:${statusColor};font-size:12px"><i class="fas ${statusIcon}"></i></span>
+                </div>`;
+            }).join('');
+        }
+
+        function clearActionLog() {
+            actionLogs = [];
+            localStorage.removeItem('nexus_action_logs');
+            renderActionLog();
+            showToast('操作日志已清空', 'success');
+        }
+
+        // ===== Toast =====
+        function showToast(message, type) {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = 'toast ' + type;
+            const icons = { success: 'check-circle', error: 'times-circle', info: 'info-circle', warning: 'exclamation-circle' };
+            toast.innerHTML = `<i class="fas fa-${icons[type] || 'info-circle'}"></i> ${escapeHtml(message)}`;
+            container.appendChild(toast);
+            setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 3500);
+        }
+
+        // ===== 初始化 =====
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSystemData();
+            renderActionLog();
+            // 每30秒刷新服务状态
+            setInterval(loadSystemData, 30000);
+        });
+
+        // ===== 加载系统数据 =====
+        async function loadSystemData() {
+            try {
+                const resp = await fetch(API_HOST + '/api/systems');
+                const data = await resp.json();
+                renderServices(data.services || []);
+                renderProjects(data.projects || []);
+                renderSkills(data.skills || []);
+                updateStats(data);
+            } catch (e) {
+                console.error('加载系统数据失败:', e);
+            }
+        }
+
+        // ===== 更新统计 =====
+        function updateStats(data) {
+            const services = data.services || [];
+            const projects = data.projects || [];
+            const skills = data.skills || [];
+            document.getElementById('stat-systems').textContent = services.length;
+            document.getElementById('stat-projects').textContent = projects.length;
+            document.getElementById('stat-skills-custom').textContent = skills.length;
+            document.getElementById('stat-uptime').textContent = data.uptime || '--';
+            document.getElementById('service-count').textContent = services.length + ' 个服务';
+            document.getElementById('project-count').textContent = projects.length + ' 个项目';
+            document.getElementById('skill-count').textContent = skills.length + ' 个技能';
+        }
+
+        // ===== 颜色循环 =====
+        const colorCycle = [
+            'linear-gradient(135deg, var(--accent-1), var(--accent-2))',
+            'linear-gradient(135deg, var(--accent-4), #34d399)',
+            'linear-gradient(135deg, var(--accent-3), var(--accent-4))',
+            'linear-gradient(135deg, var(--accent-5), #fbbf24)',
+            'linear-gradient(135deg, #6b7280, #9ca3af)',
+            'linear-gradient(135deg, #8b5cf6, #a78bfa)',
+            'linear-gradient(135deg, var(--accent-6), #dc2626)',
+            'linear-gradient(135deg, #06b6d4, #22d3ee)',
+        ];
+        function getColor(i) { return colorCycle[i % colorCycle.length]; }
+        function escapeHtml(value) {
+            const div = document.createElement('div');
+            div.textContent = value == null ? '' : String(value);
+            return div.innerHTML;
+        }
+        function jsArg(value) {
+            return JSON.stringify(value == null ? '' : String(value))
+                .replace(/</g, '\\u003c')
+                .replace(/>/g, '\\u003e')
+                .replace(/&/g, '\\u0026');
+        }
+        function clampPercent(value) {
+            const n = Number(value);
+            if (!Number.isFinite(n)) return 0;
+            return Math.max(0, Math.min(100, n));
+        }
+
+        // ===== 渲染服务列表 =====
+        function renderServices(services) {
+            const container = document.getElementById('serviceList');
+            if (services.length === 0) {
+                container.innerHTML = '<div class="empty-state"><i class="fas fa-server"></i><p>暂无服务数据</p></div>';
+                return;
+            }
+            container.innerHTML = services.map((svc, i) => {
+                const isOnline = svc.status === 'online';
+                const statusClass = isOnline ? 'online' : 'offline';
+                const statusText = isOnline ? '● 运行中' : '○ 已停止';
+                const iconBg = getColor(i);
+                const cpu = clampPercent(svc.cpu);
+                const progressBar = svc.cpu !== undefined ? `<div class="sys-progress"><div class="sys-progress-bar" style="width:${cpu}%;background:${iconBg}"></div></div>` : '';
+                const progressLabel = svc.cpu !== undefined ? `<div class="service-info-item"><i class="fas fa-microchip"></i> CPU: <span>${cpu}%</span></div>` : '';
+                const memLabel = svc.memory ? `<div class="service-info-item"><i class="fas fa-memory"></i> 内存: <span>${escapeHtml(svc.memory)}</span></div>` : '';
+                const portText = (svc.port === null || svc.port === undefined || svc.port === '') ? '--' : String(svc.port);
+                const portLabel = `<div class="service-info-item"><i class="fas fa-network-wired"></i> 端口: <span>${escapeHtml(portText)}</span></div>`;
+                const pidLabel = svc.pid ? `<div class="service-info-item"><i class="fas fa-fingerprint"></i> PID: <span>${escapeHtml(svc.pid)}</span></div>` : '';
+                const serviceButtons = svc.id === 'panel-server'
+                    ? `<button class="sys-action-btn" onclick='serviceAction("status", ${jsArg(svc.id)})'><i class="fas fa-info-circle"></i> 状态</button>`
+                    : `${isOnline ? `
+                            <button class="sys-action-btn warning" onclick='serviceAction("restart", ${jsArg(svc.id)})'><i class="fas fa-sync-alt"></i> 重启</button>
+                            <button class="sys-action-btn danger" onclick='serviceAction("stop", ${jsArg(svc.id)})'><i class="fas fa-stop"></i> 停止</button>
+                        ` : `
+                            <button class="sys-action-btn success" onclick='serviceAction("start", ${jsArg(svc.id)})'><i class="fas fa-play"></i> 启动</button>
+                        `}
+                        <button class="sys-action-btn" onclick='serviceAction("status", ${jsArg(svc.id)})'><i class="fas fa-info-circle"></i> 状态</button>`;
+
+                return `<div class="service-card" style="--card-color: ${iconBg}">
+                    <div class="service-top">
+                        <div class="service-title">
+                            <div class="service-icon" style="background:${iconBg}">${escapeHtml(svc.icon || '⚙️')}</div>
+                            <div>
+                                <div class="service-name">${escapeHtml(svc.name)}</div>
+                            </div>
+                        </div>
+                        <span class="service-status ${statusClass}">${statusText}</span>
+                    </div>
+                    <div class="service-desc">${escapeHtml(svc.description || '')}</div>
+                    <div class="service-info">
+                        ${progressLabel}
+                        ${memLabel}
+                        ${portLabel}
+                        ${pidLabel}
+                    </div>
+                    ${progressBar}
+                    <div class="service-btns" style="margin-top:12px">
+                        ${serviceButtons}
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        // ===== 渲染项目列表 =====
+        function renderProjects(projects) {
+            const container = document.getElementById('projectList');
+            if (projects.length === 0) {
+                container.innerHTML = '<div class="empty-state"><i class="fas fa-folder"></i><p>暂无项目数据</p></div>';
+                return;
+            }
+            container.innerHTML = projects.map((proj, i) => {
+                const iconBg = getColor(i);
+                const tags = proj.tags || [];
+                const portText = (proj.port === null || proj.port === undefined || proj.port === '') ? '未开放' : String(proj.port);
+                const allTags = [`端口 ${portText}`, ...tags];
+                const lastMod = proj.lastModified ? new Date(proj.lastModified).toLocaleDateString('zh-CN') : '--';
+                return `<div class="project-card" style="--card-color: ${iconBg}">
+                    <div class="project-top">
+                        <div class="project-icon" style="background:${iconBg}">${escapeHtml(proj.icon || '📁')}</div>
+                        <div class="project-info">
+                            <h3>${escapeHtml(proj.name)}</h3>
+                            <div class="project-path">${escapeHtml(proj.path)}</div>
+                        </div>
+                    </div>
+                    <div class="project-desc">${escapeHtml(proj.description || '暂无描述')}</div>
+                    <div class="project-tags">
+                        ${allTags.map(t => `<span class="project-tag">${escapeHtml(t)}</span>`).join('')}
+                    </div>
+                    <div class="project-footer">
+                        <span class="project-date"><i class="fas fa-clock"></i> ${escapeHtml(lastMod)}</span>
+                        <div class="service-btns">
+                            <button class="sys-action-btn" onclick='openProject(${jsArg(proj.path)})'><i class="fas fa-folder-open"></i> 浏览</button>
+                            ${proj.url ? `<button class="sys-action-btn success" onclick='window.open(${jsArg(proj.url)}, "_blank", "noopener")'><i class="fas fa-external-link-alt"></i> 访问</button>` : ''}
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        // ===== 渲染技能列表 =====
+        function renderSkills(skills) {
+            const container = document.getElementById('skillList');
+            if (skills.length === 0) {
+                container.innerHTML = '<div class="empty-state"><i class="fas fa-puzzle-piece"></i><p>暂无自定义技能</p></div>';
+                return;
+            }
+            container.innerHTML = skills.map((skill, i) => {
+                const iconBg = getColor(i);
+                const emoji = skill.emoji || '📦';
+                return `<div class="project-card" style="--card-color: ${iconBg}">
+                    <div class="project-top">
+                        <div class="project-icon" style="background:${iconBg}">${escapeHtml(emoji)}</div>
+                        <div class="project-info">
+                            <h3>${escapeHtml(skill.name)}</h3>
+                            <div class="project-path">${escapeHtml(skill.path)}</div>
+                        </div>
+                    </div>
+                    <div class="project-desc">${escapeHtml(skill.description || '暂无描述')}</div>
+                    <div class="project-footer">
+                        <span class="project-date"><i class="fas fa-check-circle" style="color:var(--accent-4)"></i> 已就绪</span>
+                        <div class="service-btns">
+                            <button class="sys-action-btn" onclick='viewSkillDetail(${jsArg(skill.name)})'><i class="fas fa-eye"></i> 详情</button>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        // ===== 服务操作 =====
+        async function serviceAction(action, serviceId) {
+            const actionNames = { start: '启动', stop: '停止', restart: '重启', status: '查看状态' };
+            // 如果 requireAuth 不存在（auth.js 未加载），直接执行
+            if (typeof requireAuth !== 'function') {
+                doServiceAction(action, serviceId);
+                return;
+            }
+            requireAuth(function() {
+                doServiceAction(action, serviceId);
+            }, function() {
+                // 用户取消认证
+                addActionLog(action, serviceId, 'cancelled');
+            });
+        }
+
+        async function doServiceAction(action, serviceId) {
+            const actionNames = { start: '启动', stop: '停止', restart: '重启', status: '查看状态' };
+            addActionLog(action, serviceId, 'pending');
+            showToast(`正在${actionNames[action] || action} ${serviceId}...`, 'info');
+
+            try {
+                const resp = await fetch(API_HOST + '/api/service/' + action + '?id=' + encodeURIComponent(serviceId));
+                const data = await resp.json();
+                if (data.success) {
+                    showToast(data.message || `${actionNames[action]}成功`, 'success');
+                    addActionLog(action, serviceId, 'success');
+                    loadSystemData();
+                } else {
+                    showToast(data.message || data.error || `${actionNames[action]}失败`, 'error');
+                    addActionLog(action, serviceId, 'error');
+                }
+            } catch (e) {
+                showToast(`${actionNames[action]}失败: ` + e.message, 'error');
+                addActionLog(action, serviceId, 'error');
+            }
+        }
+
+        // ===== 打开项目 =====
+        function openProject(path) {
+            addActionLog('open', path, 'success');
+            showToast('项目路径: ' + path, 'info');
+        }
+
+        // ===== 查看技能详情 =====
+        function viewSkillDetail(name) {
+            addActionLog('status', name, 'success');
+            window.location.href = '/skills.html';
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>会话管理 · 小猪智能体面板</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap">
+    <link rel="stylesheet" href="theme.css?v=20260429">
+    <link rel="stylesheet" href="navbar.css?v=20260429?v=20260428">
+    <style>
+        /* ===== 页面标题 ===== */
+                                        /* ===== 统计条 ===== */
+                                                                                                .stat-card.clickable { cursor: pointer; }
+
+        /* ===== 筛选栏 ===== */
+        .filter-bar {
+            display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;
+            align-items: center; background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 12px; padding: 12px 16px;
+        }
+        .filter-bar select, .filter-bar input {
+            background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+            color: var(--text-primary); border-radius: 8px; padding: 9px 14px;
+            font-size: 13px; outline: none; transition: all 0.2s;
+        }
+        .filter-bar select:focus, .filter-bar input:focus { border-color: var(--accent-2); background: rgba(255,255,255,0.06); }
+        .filter-bar input { flex: 1; min-width: 180px; }
+        .filter-bar .btn { margin-left: auto; }
+
+        /* ===== 会话表格 ===== */
+        .table-wrapper {
+            background: var(--bg-card); backdrop-filter: blur(12px);
+            border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+        }
+        .session-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        .session-table thead { position: sticky; top: 0; z-index: 1; }
+        .session-table th {
+            background: var(--bg-secondary); backdrop-filter: blur(10px);
+            padding: 14px 16px; text-align: left; font-size: 11px; font-weight: 700;
+            color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;
+            border-bottom: 1px solid var(--border);
+        }
+        .session-table td {
+            padding: 14px 16px; font-size: 13px;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+            transition: all 0.2s;
+        }
+        .session-table tbody tr { transition: all 0.2s; }
+        .session-table tbody tr:hover td { background: rgba(99,102,241,0.04); }
+        .session-table tr:last-child td { border-bottom: none; }
+
+        /* 会话来源单元格 */
+        .session-key-cell { max-width: 200px; }
+        .session-key-text {
+            display: inline-block; max-width: 200px; overflow: hidden;
+            text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;
+        }
+        .session-key-badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 4px 10px; border-radius: 8px; font-size: 12px; font-weight: 600;
+            background: rgba(99,102,241,0.08); color: var(--accent-2);
+        }
+        .session-key-badge i { font-size: 10px; }
+
+        /* 状态标签 */
+        .status-badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;
+        }
+        .status-badge.active { background: rgba(16,185,129,0.1); color: var(--accent-4); border: 1px solid rgba(16,185,129,0.2); }
+        .status-badge.active .dot { width: 7px; height: 7px; background: var(--accent-4); border-radius: 50%; box-shadow: 0 0 8px rgba(16,185,129,0.5); animation: pulse-dot 2s infinite; }
+        .status-badge.idle { background: rgba(107,114,128,0.08); color: var(--text-muted); border: 1px solid rgba(107,114,128,0.15); }
+        .status-badge.idle .dot { width: 7px; height: 7px; background: var(--text-muted); border-radius: 50%; }
+
+        /* 渠道标签 */
+        .channel-tag {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 3px 10px; border-radius: 6px;
+            font-size: 11px; font-weight: 700;
+        }
+        .channel-tag.feishu { background: rgba(37,99,235,0.1); color: #60a5fa; }
+        .channel-tag.direct { background: rgba(16,185,129,0.1); color: var(--accent-4); }
+        .channel-tag.subagent { background: rgba(139,92,246,0.12); color: #a78bfa; }
+        .channel-tag.main { background: rgba(245,158,11,0.12); color: #fbbf24; }
+        .channel-tag.dreaming { background: rgba(107,114,128,0.1); color: var(--text-muted); }
+        .channel-tag.unknown { background: rgba(107,114,128,0.1); color: var(--text-muted); }
+        .channel-tag i { font-size: 9px; }
+        .context-count { font-weight: 700; color: var(--accent-2); font-size: 12px; }
+
+        /* 消息数 & 文件大小 */
+        .msg-count { font-weight: 700; color: var(--accent-3); }
+        .file-size { color: var(--text-muted); font-size: 12px; }
+
+        /* 操作按钮组 */
+        .action-btns { display: flex; gap: 6px; white-space: nowrap; }
+        
+
+        /* ===== 详情弹窗 ===== */
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(10,10,15,0.88); backdrop-filter: blur(12px);
+            z-index: 2000; align-items: center; justify-content: center;
+            animation: overlayIn 0.2s ease;
+        }
+        .modal-overlay.show { display: flex; }
+        @keyframes overlayIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .modal-detail {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            width: 92%; max-width: 680px; max-height: 88vh;
+            overflow: hidden;
+            box-shadow: 0 32px 100px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.03);
+            animation: modalSlideIn 0.35s cubic-bezier(0.16,1,0.3,1);
+            display: flex; flex-direction: column;
+            position: relative;
+        }
+        @keyframes modalSlideIn {
+            from { opacity: 0; transform: translateY(30px) scale(0.96); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .modal-detail-accent {
+            position: absolute; top: 0; left: 0; right: 0; height: 3px;
+            background: linear-gradient(90deg, var(--accent-1), var(--accent-2), var(--accent-3));
+        }
+
+        .modal-detail-header {
+            display: flex; align-items: center; gap: 16px;
+            padding: 22px 28px 18px;
+            border-bottom: 1px solid var(--border);
+        }
+        .modal-detail-icon {
+            width: 44px; height: 44px; border-radius: 12px;
+            background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-size: 18px;
+            box-shadow: 0 4px 16px var(--glow-1);
+            flex-shrink: 0;
+        }
+        .modal-detail-title-group { flex: 1; }
+        .modal-detail-title-group h3 { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+        .modal-detail-subtitle { font-size: 12px; color: var(--text-muted); margin-top: 2px; font-family: 'JetBrains Mono', monospace; }
+        .modal-detail-close {
+            width: 36px; height: 36px; border-radius: 10px;
+            background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+            color: var(--text-secondary); cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px; transition: all 0.3s ease; flex-shrink: 0;
+        }
+        .modal-detail-close:hover {
+            background: rgba(239,68,68,0.1); color: var(--accent-6);
+            border-color: rgba(239,68,68,0.3);
+        }
+
+        .modal-detail-body { padding: 24px 28px; overflow-y: auto; flex: 1; }
+
+        .modal-detail-section { margin-bottom: 20px; }
+        .modal-detail-section:last-child { margin-bottom: 0; }
+        .modal-detail-section-header {
+            display: flex; align-items: center; gap: 8px;
+            font-size: 12px; font-weight: 700; color: var(--text-secondary);
+            margin-bottom: 14px; letter-spacing: 0.5px; text-transform: uppercase;
+            padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+        .modal-detail-section-icon {
+            width: 24px; height: 24px; border-radius: 6px;
+            display: flex; align-items: center; justify-content: center; font-size: 11px;
+        }
+
+        .modal-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .modal-detail-item {
+            background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04);
+            border-radius: 10px; padding: 12px;
+            display: flex; align-items: center; gap: 10px;
+            transition: all 0.2s ease;
+        }
+        .modal-detail-item:hover { background: rgba(255,255,255,0.05); border-color: var(--border-glow); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        .modal-detail-item-icon {
+            width: 32px; height: 32px; border-radius: 8px;
+            display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0;
+        }
+        .modal-detail-item-content { flex: 1; min-width: 0; }
+        .modal-detail-item-label { display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 3px; font-weight: 500; }
+        .modal-detail-item-value { display: block; font-size: 13px; font-weight: 600; color: var(--text-primary); word-break: break-all; }
+
+        .modal-detail-footer {
+            padding: 16px 28px; border-top: 1px solid var(--border);
+            display: flex; justify-content: flex-end; gap: 8px;
+            background: rgba(0,0,0,0.15);
+        }
+
+        @media (max-width: 600px) {
+            .modal-detail { width: 96%; max-height: 92vh; }
+            .modal-detail-grid { grid-template-columns: 1fr; }
+            .modal-detail-header { padding: 16px 16px 12px; }
+            .modal-detail-body { padding: 16px; }
+            .modal-detail-footer { padding: 12px 16px; }
+            .modal-detail-icon { width: 38px; height: 38px; font-size: 15px; }
+        }
+
+        /* ===== 确认弹窗 ===== */
+        .confirm-modal .modal { max-width: 400px; text-align: center; padding: 32px 28px; }
+        .confirm-icon {
+            width: 64px; height: 64px; border-radius: 50%;
+            background: rgba(239,68,68,0.1); border: 2px solid rgba(239,68,68,0.2);
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 16px; font-size: 28px; color: var(--accent-6);
+        }
+        .confirm-title { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+        .confirm-desc { color: var(--text-muted); margin-bottom: 24px; line-height: 1.5; }
+        .confirm-btns { display: flex; gap: 12px; justify-content: center; }
+
+        /* ===== 空状态 ===== */
+        .empty-state { text-align: center; padding: 80px 20px; color: var(--text-muted); }
+        .empty-state i { font-size: 52px; margin-bottom: 16px; opacity: 0.3; }
+        .empty-state p { font-size: 15px; }
+        .empty-state .sub { font-size: 12px; margin-top: 6px; opacity: 0.6; }
+
+        /* ===== 手机端卡片布局 ===== */
+        .session-cards { display: none; }
+        .session-card {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 12px; padding: 16px; margin-bottom: 12px;
+            transition: all 0.2s;
+        }
+        .session-card:hover { border-color: var(--border-glow); }
+        .session-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .session-card-title { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+        .session-card-title i { color: var(--accent-5); font-size: 12px; }
+        .session-card-body { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px; }
+        .session-card-item { font-size: 12px; }
+        .session-card-item .key { color: var(--text-muted); margin-right: 4px; }
+        .session-card-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+        /* ===== 加载状态 ===== */
+        .loading-row { text-align: center; padding: 60px; color: var(--text-muted); }
+        .loading-row i { font-size: 28px; animation: spin 1s linear infinite; }
+        .loading-row p { margin-top: 12px; font-size: 13px; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        /* ===== 刷新动画 ===== */
+        .refreshing { animation: spin 0.6s linear; }
+
+        @keyframes pulse-dot { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.8); } }
+
+        /* ===== 响应式 ===== */
+        @media (max-width: 1024px) {
+                    }
+        @media (max-width: 768px) {
+            .table-wrapper { display: none; }
+            .session-cards { display: block; }
+            .filter-bar { flex-direction: column; padding: 10px; }
+            .filter-bar input, .filter-bar select, .filter-bar .btn { width: 100%; }
+            .filter-bar .btn { margin-left: 0; }
+                        }
+        @media (max-width: 480px) {
+                                                    .session-card-body { grid-template-columns: 1fr; }
+        }
+    
+        /* ===== 主题适配 ===== */
+                [data-theme="light"] .filter-bar { background: rgba(255,255,255,0.8); border-color: rgba(0,0,0,0.08); }
+        [data-theme="light"] .filter-bar select,
+        [data-theme="light"] .filter-bar input { background: white; border-color: rgba(0,0,0,0.12); color: #1a1a2e; }
+        [data-theme="light"] .session-table th { background: rgba(0,0,0,0.04); color: #5a5a6e; }
+        [data-theme="light"] .session-table td { border-color: rgba(0,0,0,0.06); }
+        [data-theme="light"] .session-card { background: rgba(255,255,255,0.9); border-color: rgba(0,0,0,0.08); }
+        [data-theme="light"] .session-card-body { background: rgba(0,0,0,0.02); }
+</style>
+</head>
+<body>
+    
+    
+
+    <div class="main-container">
+
+        <!-- 统计条 -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" id="stat-total">--</div>
+                <div class="stat-label"><i class="fas fa-database"></i> 总会话数</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-active">--</div>
+                <div class="stat-label"><i class="fas fa-bolt"></i> 活跃会话</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-idle">--</div>
+                <div class="stat-label"><i class="fas fa-moon"></i> 空闲会话</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-msgs">--</div>
+                <div class="stat-label"><i class="fas fa-envelope"></i> 总消息数</div>
+            </div>
+            <div class="stat-card clickable" id="stat-dreaming-card" onclick="toggleDreaming()"><div class="stat-value" id="stat-dreaming">--</div><div class="stat-label"><i class="fas fa-cloud-moon"></i> 梦境会话 <i class="fas fa-eye-slash" id="dreaming-toggle-icon" style="font-size:9px;opacity:0.5"></i></div></div>
+            <div class="stat-card clickable" id="stat-subagent-card" onclick="toggleSubagent()"><div class="stat-value" id="stat-subagent">--</div><div class="stat-label"><i class="fas fa-sitemap"></i> 子任务会话 <i class="fas fa-eye-slash" id="subagent-toggle-icon" style="font-size:9px;opacity:0.5"></i></div></div>
+        </div>
+
+        <!-- 筛选栏 -->
+        <div class="filter-bar">
+            <input type="text" id="searchInput" placeholder="🔍 搜索会话来源、渠道或用户ID...">
+            <select id="filterChannel">
+                <option value="">全部渠道</option>
+            </select>
+            <select id="filterStatus">
+                <option value="">全部状态</option>
+                <option value="活跃">活跃</option>
+                <option value="空闲">空闲</option>
+            </select>
+            <button class="btn btn-ghost btn-sm" onclick="requireAuth(function(){refreshSessions()},function(){})" id="refreshBtn"><i class="fas fa-sync-alt"></i> 刷新</button>
+        </div>
+
+        <!-- 会话表格（桌面端） -->
+        <div class="table-wrapper">
+            <table class="session-table">
+                <colgroup>
+                    <col style="width: 20%">
+                    <col style="width: 10%">
+                    <col style="width: 8%">
+                    <col style="width: 8%">
+                    <col style="width: 8%">
+                    <col style="width: 8%">
+                    <col style="width: 10%">
+                    <col style="width: 10%">
+                    <col style="width: 10%">
+                    <col style="width: 8%">
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th>会话来源</th>
+                        <th>渠道</th>
+                        <th>类型</th>
+                        <th>状态</th>
+                        <th>消息数</th>
+                        <th>上下文</th>
+                        <th>文件大小</th>
+                        <th>最后活跃</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="sessionTableBody">
+                    <tr><td colspan="9" class="loading-row"><i class="fas fa-spinner"></i><p>正在加载会话数据...</p></td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 会话卡片（手机端） -->
+        <div class="session-cards" id="sessionCards">
+            <div class="loading-row"><i class="fas fa-spinner"></i><p>正在加载会话数据...</p></div>
+        </div>
+    </div>
+
+    <!-- 详情弹窗 -->
+    <div class="modal-overlay" id="detailModal">
+        <div class="modal-detail">
+            <div class="modal-detail-accent"></div>
+            <div class="modal-detail-header">
+                <div class="modal-detail-icon"><i class="fas fa-comments"></i></div>
+                <div class="modal-detail-title-group">
+                    <h3>会话详情</h3>
+                    <span class="modal-detail-subtitle" id="modalSessionKey">--</span>
+                </div>
+                <button class="modal-detail-close" onclick="closeDetailModal()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-detail-body">
+                <div class="modal-detail-section">
+                    <div class="modal-detail-section-header">
+                        <div class="modal-detail-section-icon" style="background:linear-gradient(135deg,rgba(99,102,241,0.15),rgba(139,92,246,0.1));color:var(--accent-1)"><i class="fas fa-fingerprint"></i></div>
+                        <span>基本信息</span>
+                    </div>
+                    <div class="modal-detail-grid">
+                        <div class="modal-detail-item">
+                            <div class="modal-detail-item-icon" style="background:rgba(99,102,241,0.08);color:var(--accent-1)"><i class="fas fa-hashtag"></i></div>
+                            <div class="modal-detail-item-content"><span class="modal-detail-item-label">会话标识</span><span class="modal-detail-item-value" id="dKey">--</span></div>
+                        </div>
+                        <div class="modal-detail-item">
+                            <div class="modal-detail-item-icon" style="background:rgba(139,92,246,0.08);color:var(--accent-2)"><i class="fas fa-id-badge"></i></div>
+                            <div class="modal-detail-item-content"><span class="modal-detail-item-label">会话ID</span><span class="modal-detail-item-value" id="dSessionId">--</span></div>
+                        </div>
+                        <div class="modal-detail-item">
+                            <div class="modal-detail-item-icon" style="background:rgba(6,182,212,0.08);color:var(--accent-3)"><i class="fas fa-robot"></i></div>
+                            <div class="modal-detail-item-content"><span class="modal-detail-item-label">智能体</span><span class="modal-detail-item-value" id="dAgent">--</span></div>
+                        </div>
+                        <div class="modal-detail-item">
+                            <div class="modal-detail-item-icon" style="background:rgba(245,158,11,0.08);color:var(--accent-5)"><i class="fas fa-exchange-alt"></i></div>
+                            <div class="modal-detail-item-content"><span class="modal-detail-item-label">渠道</span><span class="modal-detail-item-value" id="dChannel">--</span></div>
+                        </div>
+                        <div class="modal-detail-item">
+                            <div class="modal-detail-item-icon" style="background:rgba(16,185,129,0.08);color:var(--accent-4)"><i class="fas fa-user"></i></div>
+                            <div class="modal-detail-item-content"><span class="modal-detail-item-label">用户ID</span><span class="modal-detail-item-value" id="dUserId">--</span></div>
+                        </div>
+                        <div class="modal-detail-item">
+                            <div class="modal-detail-item-icon" style="background:rgba(107,114,128,0.08);color:var(--text-muted)"><i class="fas fa-comments"></i></div>
+                            <div class="modal-detail-item-content"><span class="modal-detail-item-label">聊天类型</span><span class="modal-detail-item-value" id="dChatType">--</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-detail-section">
+                    <div class="modal-detail-section-header">
+                        <div class="modal-detail-section-icon" style="background:linear-gradient(135deg,rgba(16,185,129,0.15),rgba(6,182,212,0.1));color:var(--accent-4)"><i class="fas fa-chart-bar"></i></div>
+                        <span>运行状态</span>
+                    </div>
+                    <div class="modal-detail-grid">
+                        <div class="modal-detail-item">
+                            <div class="modal-detail-item-icon" style="background:rgba(16,185,129,0.08);color:var(--accent-4)"><i class="fas fa-signal"></i></div>
+                            <div class="modal-detail-item-content"><span class="modal-detail-item-label">运行状态</span><span class="modal-detail-item-value" id="dStatus">--</span></div>
+                        </div>
+                        <div class="modal-detail-item">
+                            <div class="modal-detail-item-icon" style="background:rgba(99,102,241,0.08);color:var(--accent-1)"><i class="fas fa-envelope"></i></div>
+                            <div class="modal-detail-item-content"><span class="modal-detail-item-label">消息数量</span><span class="modal-detail-item-value" id="dMsgCount">--</span></div>
+                        </div>
+                        <div class="modal-detail-item">
+                            <div class="modal-detail-item-icon" style="background:rgba(139,92,246,0.08);color:var(--accent-2)"><i class="fas fa-memory"></i></div>
+                            <div class="modal-detail-item-content"><span class="modal-detail-item-label">上下文使用</span><span class="modal-detail-item-value" id="dTokens">--</span></div>
+                        </div>
+                        <div class="modal-detail-item">
+                            <div class="modal-detail-item-icon" style="background:rgba(245,158,11,0.08);color:var(--accent-5)"><i class="fas fa-microchip"></i></div>
+                            <div class="modal-detail-item-content"><span class="modal-detail-item-label">使用模型</span><span class="modal-detail-item-value" id="dModel">--</span></div>
+                        </div>
+                        <div class="modal-detail-item">
+                            <div class="modal-detail-item-icon" style="background:rgba(239,68,68,0.08);color:var(--accent-6)"><i class="fas fa-exclamation-triangle"></i></div>
+                            <div class="modal-detail-item-content"><span class="modal-detail-item-label">是否中断</span><span class="modal-detail-item-value" id="dAborted">--</span></div>
+                        </div>
+                        <div class="modal-detail-item">
+                            <div class="modal-detail-item-icon" style="background:rgba(6,182,212,0.08);color:var(--accent-3)"><i class="fas fa-compress-alt"></i></div>
+                            <div class="modal-detail-item-content"><span class="modal-detail-item-label">压缩次数</span><span class="modal-detail-item-value" id="dCompaction">--</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-detail-section">
+                    <div class="modal-detail-section-header">
+                        <div class="modal-detail-section-icon" style="background:linear-gradient(135deg,rgba(245,158,11,0.15),rgba(239,68,68,0.1));color:var(--accent-5)"><i class="fas fa-file-alt"></i></div>
+                        <span>文件信息</span>
+                    </div>
+                    <div class="modal-detail-grid">
+                        <div class="modal-detail-item">
+                            <div class="modal-detail-item-icon" style="background:rgba(6,182,212,0.08);color:var(--accent-3)"><i class="fas fa-hdd"></i></div>
+                            <div class="modal-detail-item-content"><span class="modal-detail-item-label">文件大小</span><span class="modal-detail-item-value" id="dFileSize">--</span></div>
+                        </div>
+                        <div class="modal-detail-item">
+                            <div class="modal-detail-item-icon" style="background:rgba(16,185,129,0.08);color:var(--accent-4)"><i class="fas fa-clock"></i></div>
+                            <div class="modal-detail-item-content"><span class="modal-detail-item-label">最后活跃</span><span class="modal-detail-item-value" id="dLastActive">--</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-detail-footer">
+                <button class="btn btn-ghost" onclick="closeDetailModal()"><i class="fas fa-times"></i> 关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 删除确认弹窗 -->
+    <div class="modal-overlay confirm-modal" id="confirmModal">
+        <div class="modal">
+            <div class="confirm-icon"><i class="fas fa-exclamation-triangle"></i></div>
+            <div class="confirm-title">确认删除会话？</div>
+            <div class="confirm-desc" id="confirmDesc">此操作不可恢复，确定要删除该会话吗？</div>
+            <div class="confirm-btns">
+                <button class="btn btn-ghost" onclick="closeConfirmModal()">取消</button>
+                <button class="btn btn-danger" id="confirmDeleteBtn"><i class="fas fa-trash"></i> 确认删除</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_HOST = window.location.origin;
+        let allSessions = [];
+        let filteredSessions = [];
+        let showDreaming = false;
+        let showSubagent = false;
+
+        function escapeHtml(value) {
+            const div = document.createElement('div');
+            div.textContent = value == null ? '' : String(value);
+            return div.innerHTML;
+        }
+
+        function jsArg(value) {
+            return JSON.stringify(value == null ? '' : String(value))
+                .replace(/</g, '\\u003c')
+                .replace(/>/g, '\\u003e')
+                .replace(/&/g, '\\u0026');
+        }
+
+        // 加载会话数据
+        async function loadSessions() {
+            try {
+                const resp = await fetch(API_HOST + '/api/sessions');
+                const data = await resp.json();
+                allSessions = data.sessions || [];
+                updateStats();
+                applyFilter();
+                updateFilterOptions();
+            } catch(e) {
+                console.error('加载会话失败:', e);
+                const errHtml = `<tr><td colspan="9" class="empty-state"><i class="fas fa-exclamation-circle"></i><p>加载失败: ${escapeHtml(e.message)}</p></td></tr>`;
+                document.getElementById('sessionTableBody').innerHTML = errHtml;
+                document.getElementById('sessionCards').innerHTML = `<div class="empty-state"><i class="fas fa-exclamation-circle"></i><p>加载失败: ${escapeHtml(e.message)}</p></div>`;
+            }
+        }
+
+        // 更新统计
+        function updateStats() {
+            const total = allSessions.length;
+            const active = allSessions.filter(s => s.status === '活跃').length;
+            const idle = allSessions.filter(s => s.status === '空闲').length;
+            const msgs = allSessions.reduce((sum, s) => sum + (s.msg_count || 0), 0);
+            const dreaming = allSessions.filter(s => s.session_type === 'dreaming').length;
+            const subagent = allSessions.filter(s => s.session_type === 'subagent').length;
+            animateValue('stat-total', total);
+            animateValue('stat-active', active);
+            animateValue('stat-idle', idle);
+            animateValue('stat-msgs', msgs);
+            animateValue('stat-dreaming', dreaming);
+            animateValue('stat-subagent', subagent);
+        }
+
+        // 数字动画
+        function animateValue(id, end) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            const start = parseInt(el.textContent.replace(/,/g, '')) || 0;
+            if (start === end) { el.textContent = end.toLocaleString('zh-CN'); return; }
+            const duration = 400;
+            const startTime = performance.now();
+            function tick(now) {
+                const elapsed = now - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const eased = 1 - Math.pow(1 - progress, 3);
+                const current = Math.round(start + (end - start) * eased);
+                el.textContent = current.toLocaleString('zh-CN');
+                if (progress < 1) requestAnimationFrame(tick);
+            }
+            requestAnimationFrame(tick);
+        }
+
+        // 更新筛选选项
+        function updateFilterOptions() {
+            const select = document.getElementById('filterChannel');
+            const currentVal = select.value;
+            const channels = [...new Set(allSessions.map(s => s.channel).filter(c => c && c !== 'unknown'))];
+            select.innerHTML = '<option value="">全部渠道</option>';
+            channels.forEach(ch => {
+                const label = ch === 'feishu' ? '飞书' : (ch === 'direct' ? '直聊' : ch);
+                select.innerHTML += `<option value="${escapeHtml(ch)}">${escapeHtml(label)}</option>`;
+            });
+            select.value = currentVal;
+        }
+
+        // 渲染表格
+        function renderTable() {
+            const tbody = document.getElementById('sessionTableBody');
+            if (filteredSessions.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" class="empty-state"><i class="fas fa-inbox"></i><p>暂无匹配的会话</p><p class="sub">尝试调整筛选条件</p></td></tr>';
+                return;
+            }
+            tbody.innerHTML = filteredSessions.map(s => `
+                <tr>
+                    <td class="session-key-cell"><span class="session-key-badge"><i class="fas fa-key"></i><span class="session-key-text" title="${escapeHtml(s.key)}">${escapeHtml(formatKey(s.key))}</span></span></td>
+                    <td>${renderChannelTag(s.session_type || s.channel)}</td>
+                    <td>${escapeHtml(s.chat_type || '--')}</td>
+                    <td><span class="status-badge ${s.status === '活跃' ? 'active' : 'idle'}"><span class="dot"></span>${escapeHtml(s.status)}</span></td>
+                    <td><span class="msg-count">${(s.msg_count || 0).toLocaleString('zh-CN')}</span></td>
+                    <td><span class="context-count" title="上下文使用 / 上下文窗口: ${(s.context_tokens||0).toLocaleString()} tokens">${formatTokens(s.last_usage_tokens || s.total_tokens)}</span></td>
+                    <td><span class="file-size">${escapeHtml(s.file_size_fmt || '--')}</span></td>
+                    <td>${escapeHtml(s.last_active || '--')}</td>
+                    <td>
+                        <div class="action-btns">
+                            <button class="btn btn-ghost btn-sm" onclick='showDetail(${jsArg(s.session_id)})' title="查看详情"><i class="fas fa-eye"></i></button>
+                            <button class="btn btn-danger btn-sm" onclick='requireAuth(function(){confirmDelete(${jsArg(encodeURIComponent(s.key))}, ${jsArg(formatKey(s.key))})},function(){})' title="删除"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // 渲染卡片（手机端）
+        function renderCards() {
+            const container = document.getElementById('sessionCards');
+            if (filteredSessions.length === 0) {
+                container.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>暂无匹配的会话</p></div>';
+                return;
+            }
+            container.innerHTML = filteredSessions.map(s => `
+                <div class="session-card">
+                    <div class="session-card-header">
+                        <div class="session-card-title"><i class="fas fa-key"></i> ${escapeHtml(formatKey(s.key))}</div>
+                        <span class="status-badge ${s.status === '活跃' ? 'active' : 'idle'}"><span class="dot"></span>${escapeHtml(s.status)}</span>
+                    </div>
+                    <div class="session-card-body">
+                        <div class="session-card-item"><span class="key">渠道:</span> ${renderChannelTag(s.session_type || s.channel)}</div>
+                        <div class="session-card-item"><span class="key">类型:</span> ${escapeHtml(s.chat_type || '--')}</div>
+                        <div class="session-card-item"><span class="key">消息:</span> <span class="msg-count">${(s.msg_count || 0).toLocaleString('zh-CN')}</span></div>
+                        <div class="session-card-item"><span class="key">上下文:</span> <span class="context-count">${formatTokens(s.last_usage_tokens || s.total_tokens)}</span></div>
+                        <div class="session-card-item"><span class="key">大小:</span> ${escapeHtml(s.file_size_fmt || '--')}</div>
+                        <div class="session-card-item"><span class="key">活跃:</span> ${escapeHtml(s.last_active || '--')}</div>
+                        <div class="session-card-item"><span class="key">压缩:</span> ${s.compaction_count || 0}次</div>
+                    </div>
+                    <div class="session-card-actions">
+                        <button class="btn btn-ghost btn-sm" onclick='showDetail(${jsArg(s.session_id)})'><i class="fas fa-eye"></i> 详情</button>
+                        <button class="btn btn-danger btn-sm" onclick='requireAuth(function(){confirmDelete(${jsArg(encodeURIComponent(s.key))}, ${jsArg(formatKey(s.key))})},function(){})'><i class="fas fa-trash"></i> 删除</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // 格式化key
+        function formatKey(key) {
+            const parts = key.split(':');
+            if (parts.length >= 4) {
+                const user = parts[3];
+                if (user.startsWith('ou_')) return '飞书用户 ...' + user.slice(-6);
+                if (user.length > 20) return user.slice(0, 20) + '...';
+                return user;
+            }
+            return key.length > 30 ? key.slice(0, 30) + '...' : key;
+        }
+
+        // 格式化渠道
+        function formatChannel(ch, sessionType) {
+            const map = {
+                'feishu': '飞书',
+                'direct': '直聊',
+                'subagent': '子任务',
+                'main': '网页主窗口',
+                'dreaming': '梦境',
+                'unknown': '未知'
+            };
+            if (sessionType && map[sessionType]) return map[sessionType];
+            return map[ch] || ch;
+        }
+
+        // 格式化token数
+        function formatTokens(n) {
+            if (!n) return '--';
+            if (n >= 1000000) return (n/1000000).toFixed(1) + 'M';
+            if (n >= 1000) return (n/1000).toFixed(1) + 'K';
+            return n.toLocaleString('zh-CN');
+        }
+
+        // 渲染渠道标签
+        function renderChannelTag(sessionType) {
+            const map = {
+                'feishu':    { cls: 'feishu',    icon: 'paper-plane', label: '飞书' },
+                'subagent':  { cls: 'subagent',  icon: 'sitemap',     label: '子任务' },
+                'main':      { cls: 'main',      icon: 'desktop',     label: '网页主窗口' },
+                'dreaming':  { cls: 'dreaming',  icon: 'cloud-moon',  label: '梦境' },
+                'unknown':   { cls: 'unknown',   icon: 'question',    label: '未知' }
+            };
+            const info = map[sessionType] || map['unknown'];
+            return `<span class="channel-tag ${info.cls}"><i class="fas fa-${info.icon}"></i>${info.label}</span>`;
+        }
+
+        // 切换梦境显示
+        function toggleDreaming() {
+            showDreaming = !showDreaming;
+            const icon = document.getElementById('dreaming-toggle-icon');
+            if (icon) {
+                icon.className = showDreaming ? 'fas fa-eye' : 'fas fa-eye-slash';
+            }
+            applyFilter();
+        }
+
+        // 切换子任务显示
+        function toggleSubagent() {
+            showSubagent = !showSubagent;
+            const icon = document.getElementById('subagent-toggle-icon');
+            if (icon) {
+                icon.className = showSubagent ? 'fas fa-eye' : 'fas fa-eye-slash';
+            }
+            applyFilter();
+        }
+
+        // 筛选
+        function applyFilter() {
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            const channel = document.getElementById('filterChannel').value;
+            const status = document.getElementById('filterStatus').value;
+            filteredSessions = allSessions.filter(s => {
+                if (!showDreaming && s.session_type === 'dreaming') return false;
+                if (!showSubagent && s.session_type === 'subagent') return false;
+                const keyText = String(s.key || '').toLowerCase();
+                const channelText = String(s.channel || '').toLowerCase();
+                const userText = String(s.user_id || '').toLowerCase();
+                if (search && !keyText.includes(search) && !channelText.includes(search) && !userText.includes(search)) return false;
+                if (channel && s.channel !== channel) return false;
+                if (status && s.status !== status) return false;
+                return true;
+            });
+            renderTable();
+            renderCards();
+        }
+
+        // 刷新
+        function refreshSessions() {
+            const btn = document.getElementById('refreshBtn');
+            btn.classList.add('refreshing');
+            setTimeout(() => btn.classList.remove('refreshing'), 600);
+            loadSessions();
+        }
+
+        // 详情弹窗
+        function showDetail(sessionId) {
+            const s = allSessions.find(x => x.session_id === sessionId);
+            if (!s) return;
+            document.getElementById('modalSessionKey').textContent = s.key;
+            document.getElementById('dKey').textContent = s.key;
+            document.getElementById('dSessionId').textContent = s.session_id || '--';
+            document.getElementById('dAgent').textContent = s.agent_id || '--';
+            document.getElementById('dChannel').innerHTML = renderChannelTag(s.session_type || s.channel);
+            document.getElementById('dUserId').textContent = s.user_id || '--';
+            document.getElementById('dChatType').textContent = s.chat_type || '--';
+            document.getElementById('dStatus').innerHTML = `<span class="status-badge ${s.status === '活跃' ? 'active' : 'idle'}"><span class="dot"></span>${escapeHtml(s.status)}</span>`;
+            document.getElementById('dMsgCount').textContent = (s.msg_count || 0).toLocaleString('zh-CN') + ' 条';
+            document.getElementById('dTokens').textContent = (s.last_usage_tokens || s.total_tokens || 0).toLocaleString('zh-CN') + ' tokens';
+            document.getElementById('dModel').textContent = s.model_name || '--';
+            document.getElementById('dAborted').innerHTML = s.aborted ? '<span style="color:var(--accent-6)">是 ⚠️</span>' : '否';
+            document.getElementById('dCompaction').textContent = (s.compaction_count || 0) + ' 次';
+            document.getElementById('dFileSize').textContent = s.file_size_fmt || '--';
+            document.getElementById('dLastActive').textContent = s.last_active || '--';
+            document.getElementById('detailModal').classList.add('show');
+        }
+        function closeDetailModal() { document.getElementById('detailModal').classList.remove('show'); }
+
+        // 删除确认
+        let deleteTargetKey = '';
+        function confirmDelete(encodedKey, displayName) {
+            deleteTargetKey = encodedKey;
+            document.getElementById('confirmDesc').textContent = `确定要删除会话「${displayName}」吗？此操作将永久删除会话文件且不可恢复。`;
+            document.getElementById('confirmModal').classList.add('show');
+        }
+        function closeConfirmModal() { document.getElementById('confirmModal').classList.remove('show'); }
+        document.getElementById('confirmDeleteBtn').onclick = async function() {
+            if (!deleteTargetKey) return;
+            try {
+                const resp = await fetch(API_HOST + '/api/sessions/' + deleteTargetKey, { method: 'DELETE' });
+                const data = await resp.json();
+                closeConfirmModal();
+                if (data.status === 'success') {
+                    loadSessions();
+                } else {
+                    alert('删除失败: ' + (data.error || '未知错误'));
+                }
+            } catch(e) {
+                alert('删除失败: ' + e.message);
+            }
+        };
+
+        // 筛选事件
+        document.getElementById('searchInput').addEventListener('input', applyFilter);
+        document.getElementById('filterChannel').addEventListener('change', applyFilter);
+        document.getElementById('filterStatus').addEventListener('change', applyFilter);
+
+        // 点击弹窗外部关闭
+        document.getElementById('detailModal').addEventListener('click', function(e) { if (e.target === this) closeDetailModal(); });
+        document.getElementById('confirmModal').addEventListener('click', function(e) { if (e.target === this) closeConfirmModal(); });
+
+        // 自动刷新
+        loadSessions();
+        setInterval(loadSessions, 30000);
+    </script>
+    <script src="auth.js?v=20260429"></script>
+<script src="navbar.js?v=20260429"></script>
+</body>
+</html>

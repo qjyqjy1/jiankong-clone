@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>更新日志 · 小猪智能体面板</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="theme.css?v=20260429">
+    <link rel="stylesheet" href="navbar.css?v=20260429?v=20260428">
+    <style>
+        
+        
+        
+        
+        
+        
+                                .timeline { position: relative; padding-left: 24px; }
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 7px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: linear-gradient(to bottom, var(--accent-1), var(--accent-2), var(--accent-3), transparent);
+        }
+        .version-entry {
+            margin-bottom: 16px;
+            position: relative;
+            animation: fadeInUp 0.4s ease forwards;
+        }
+        .version-entry::before {
+            content: '';
+            position: absolute;
+            left: -21px;
+            top: 5px;
+            width: 10px;
+            height: 10px;
+            background: var(--bg-primary);
+            border: 2px solid var(--accent-1);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--glow-1);
+        }
+        .version-entry:nth-child(2)::before { border-color: var(--accent-2); box-shadow: 0 0 8px var(--glow-2); }
+        .version-entry:nth-child(3)::before { border-color: var(--accent-3); }
+        .version-entry:nth-child(4)::before { border-color: var(--accent-4); }
+        .version-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+        .version-number {
+            background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+            color: white;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 700;
+            box-shadow: 0 2px 8px var(--glow-1);
+        }
+        .version-date { color: var(--text-muted); font-size: 13px; font-weight: 500; }
+        .version-card {
+            background: var(--bg-card);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 14px 16px;
+            transition: all 0.3s ease;
+        }
+        .version-card:hover { border-color: var(--border-glow); }
+        .changelog-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+        .changelog-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            padding: 6px 10px;
+            background: rgba(255,255,255,0.02);
+            border-radius: 6px;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+        [data-theme="light"] .changelog-item { background: rgba(0,0,0,0.02); }
+        .changelog-item::before {
+            content: '';
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: var(--accent-1);
+            margin-top: 5px;
+            flex-shrink: 0;
+        }
+        .version-type {
+            display: inline-block;
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 700;
+            margin-right: 6px;
+        }
+        .version-type.feature { background: rgba(16,185,129,0.15); color: var(--accent-4); }
+        .version-type.fix { background: rgba(99,102,241,0.15); color: var(--accent-1); }
+        .version-type.ui { background: rgba(245,158,11,0.15); color: var(--accent-5); }
+        .version-type.enhancement { background: rgba(139,92,246,0.15); color: var(--accent-2); }
+        .version-type.note { background: rgba(6,182,212,0.15); color: var(--accent-3); }
+        .version-type.perf { background: rgba(239,68,68,0.15); color: var(--accent-6); }
+        .version-type.refactor { background: rgba(139,92,246,0.15); color: var(--accent-2); }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        
+        @media (max-width: 768px) {
+                            .timeline { padding-left: 20px; }
+        }
+        @media (max-width: 480px) {
+                            .version-card { padding: 10px; }
+            .version-number { font-size: 10px; padding: 2px 8px; }
+            .changelog-item { font-size: 12px; padding: 5px 8px; }
+            .timeline { padding-left: 16px; }
+            .timeline::before { left: 5px; }
+            .version-entry::before { left: -17px; width: 8px; height: 8px; }
+        }
+        
+        
+        
+    
+        [data-theme="light"] .changelog-item { background: rgba(0,0,0,0.02); }
+        [data-theme="light"] .version-card { background: rgba(255,255,255,0.9); border-color: rgba(0,0,0,0.08); }
+        [data-theme="light"] .version-header { border-color: rgba(0,0,0,0.06); }
+        [data-theme="light"] .version-number { color: white; background: linear-gradient(135deg, #3730a3, #6d28d9); }
+        [data-theme="light"] .version-date { color: var(--text-muted); }
+        [data-theme="light"] .timeline::before { background: rgba(0,0,0,0.1); }
+</style>
+</head>
+<body>
+    
+    
+
+    <div class="main-container">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" id="stat-total-versions">--</div>
+                <div class="stat-label"><i class="fas fa-code-branch"></i> 总版本数</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-total-changes">--</div>
+                <div class="stat-label"><i class="fas fa-star"></i> 功能更新</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-ui-changes">--</div>
+                <div class="stat-label"><i class="fas fa-paint-brush"></i> 界面优化</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-fix-changes">--</div>
+                <div class="stat-label"><i class="fas fa-wrench"></i> 问题修复</div>
+            </div>
+        </div>
+        <div class="timeline" id="timeline"></div>
+    </div>
+
+    <script>
+    // ========== 智能体面板更新日志（静态数据）==========
+    // 只记录与智能体面板直接相关的更新
+    // 添加新版本时，在 entries 数组开头插入
+    // 类型：新功能 / 修复 / 界面 / 优化 / 重构 / 性能
+    const CHANGELOG_DATA = {
+        "entries": [
+            {
+                "version": "v1.3.0",
+                "date": "2026-04-30",
+                "changes": [
+                    {"type": "修复", "desc": "模型列表不再从 provider 拉全量，只展示 agent 实际配置的模型"},
+                    {"type": "修复", "desc": "agent_model_lists 正确填充，切换模型按钮正常显示"},
+                    {"type": "修复", "desc": "系统信息（CPU/内存/磁盘/网络）使用 psutil 读取真实数据"},
+                    {"type": "修复", "desc": "会话列表从 /root/.codex/sessions/ 扫描真实 rollout 文件"},
+                    {"type": "修复", "desc": "技能列表从 /root/.hermes/skills/ 扫描 SKILL.md frontmatter"},
+                    {"type": "修复", "desc": "服务列表从 systemctl running 检测真实运行中的服务"},
+                    {"type": "修复", "desc": "调用统计从 logs_2.sqlite 读取真实日志记录数"},
+                    {"type": "修复", "desc": "替换版本日志为本项目自己的更新记录"}
+                ]
+            },
+            {
+                "version": "v1.2.0",
+                "date": "2026-04-30",
+                "changes": [
+                    {"type": "新功能", "desc": "新增 /api/stats 汇总端点"},
+                    {"type": "新功能", "desc": "check_session 返回 balance_gold 余额信息"},
+                    {"type": "修复", "desc": "前端 refreshDashboard 并行请求提速"},
+                    {"type": "修复", "desc": "aiGenerateOne 不再自动 recordSent，只有真正发布才记录"},
+                    {"type": "修复", "desc": "loadQbank 正确解析 data.items"},
+                    {"type": "修复", "desc": "discoverForm 展示返回的表单字段列表"},
+                    {"type": "修复", "desc": "发布成功后自动刷新 dashboard"}
+                ]
+            },
+            {
+                "version": "v1.1.0",
+                "date": "2026-04-29",
+                "changes": [
+                    {"type": "新功能", "desc": "小猪智能体面板初版上线（端口1234）"},
+                    {"type": "新功能", "desc": "仪表盘页面：系统状态/实时日志/SSE推送"},
+                    {"type": "新功能", "desc": "模型管理页面：展示可用模型/切换模型/调用统计"},
+                    {"type": "新功能", "desc": "会话管理页面：展示 Codex 会话列表"},
+                    {"type": "新功能", "desc": "技能管理页面：展示已安装技能/安装卸载"},
+                    {"type": "新功能", "desc": "智能系统页面：服务监控/项目管理"},
+                    {"type": "新功能", "desc": "上游代理模式：优先请求上游服务，不可用时本地生成数据"}
+                ]
+            }
+        ]
+    };
+    // ==================================================
+
+    const TYPE_LABELS = {
+        '新功能': 'feature', '修复': 'fix',
+        '界面': 'ui', '优化': 'enhancement',
+        '重构': 'refactor', '性能': 'perf'
+    };
+    function esc(s) {
+        const d = document.createElement('div');
+        d.textContent = s || '';
+        return d.innerHTML;
+    }
+
+    // 直接渲染，无需API请求
+    (function renderChangelog() {
+        const entries = CHANGELOG_DATA.entries || [];
+
+        // 动态计算统计
+        let totalChanges = 0, uiChanges = 0, fixChanges = 0;
+        entries.forEach(function(entry) {
+            (entry.changes || []).forEach(function(c) {
+                totalChanges++;
+                const t = c.type || '';
+                if (t === '界面' || t === '优化' || t === '重构') uiChanges++;
+                if (t === '修复') fixChanges++;
+            });
+        });
+        document.getElementById('stat-total-versions').textContent = entries.length;
+        document.getElementById('stat-total-changes').textContent = totalChanges;
+        document.getElementById('stat-ui-changes').textContent = uiChanges;
+        document.getElementById('stat-fix-changes').textContent = fixChanges;
+
+        // 渲染时间轴
+        const timeline = document.getElementById('timeline');
+        let html = '';
+        entries.forEach(function(entry, i) {
+            const changes = entry.changes || [];
+            let itemsHtml = '';
+            changes.forEach(function(c) {
+                const typeKey = TYPE_LABELS[c.type] || 'note';
+                itemsHtml += '<li class="changelog-item"><span class="version-type ' + esc(typeKey) + '">' + esc(c.type) + '</span>' + esc(c.desc) + '</li>';
+            });
+            html += '<div class="version-entry" style="animation-delay:' + (i * 0.05) + 's">' +
+                '<div class="version-header"><span class="version-number">' + esc(entry.version) + '</span><span class="version-date">' + esc(entry.date) + '</span></div>' +
+                '<div class="version-card"><ul class="changelog-list">' + itemsHtml + '</ul></div>' +
+            '</div>';
+        });
+        timeline.innerHTML = html;
+    })();
+    </script>
+    <script src="auth.js?v=20260429"></script>
+<script src="navbar.js?v=20260429"></script>
+</body>
+</html>
