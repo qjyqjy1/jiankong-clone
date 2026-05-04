@@ -13,12 +13,12 @@
 
     function readLocalAuth() {
         try {
-            const auth = sessionStorage.getItem(AUTH_CONFIG.sessionKey);
+            const auth = localStorage.getItem(AUTH_CONFIG.sessionKey);
             if (!auth) return null;
             const data = JSON.parse(auth);
             if (!data || !data.authenticated || !data.timestamp) return null;
             if (Date.now() - data.timestamp > AUTH_CONFIG.sessionTTL) {
-                sessionStorage.removeItem(AUTH_CONFIG.sessionKey);
+                localStorage.removeItem(AUTH_CONFIG.sessionKey);
                 return null;
             }
             return data;
@@ -32,14 +32,14 @@
     }
 
     function markAuthenticated() {
-        sessionStorage.setItem(AUTH_CONFIG.sessionKey, JSON.stringify({
+        localStorage.setItem(AUTH_CONFIG.sessionKey, JSON.stringify({
             authenticated: true,
             timestamp: Date.now()
         }));
     }
 
     function clearAuthenticated() {
-        sessionStorage.removeItem(AUTH_CONFIG.sessionKey);
+        localStorage.removeItem(AUTH_CONFIG.sessionKey);
     }
 
     async function checkServerAuth() {
@@ -166,9 +166,45 @@
         showAuthModal(onSuccess, onCancel);
     };
 
+    // 直接显示登录弹窗（不需要回调）
+    window.showLogin = function() {
+        showAuthModal(function() {
+            updateNavAuthState();
+        }, function() {});
+    };
+
+    // 登出
+    window.logout = async function() {
+        try {
+            await fetch('/api/auth/logout', { method: 'POST' });
+        } catch(e) {}
+        clearAuthenticated();
+        updateNavAuthState();
+    };
+
+    // 更新导航栏登录/登出按钮状态
+    function updateNavAuthState() {
+        var loginBtn = document.getElementById('navLoginBtn');
+        var logoutBtn = document.getElementById('navLogoutBtn');
+        if (loginBtn) loginBtn.style.display = isAuthenticated() ? 'none' : 'inline-flex';
+        if (logoutBtn) logoutBtn.style.display = isAuthenticated() ? 'inline-flex' : 'none';
+        // 已登录则自动加载供应商配置
+        if (isAuthenticated() && typeof loadAgentConfigs === 'function') {
+            loadAgentConfigs();
+        }
+    }
+
+    // 页面加载时检查认证状态
+    (async function() {
+        await checkServerAuth();
+        updateNavAuthState();
+    })();
+
     window.isAuthenticated = isAuthenticated;
     window.NexusAuth = {
         requireAuth: window.requireAuth,
-        isAuthenticated: window.isAuthenticated
+        isAuthenticated: window.isAuthenticated,
+        showLogin: window.showLogin,
+        logout: window.logout
     };
 })();

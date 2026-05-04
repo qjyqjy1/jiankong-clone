@@ -229,6 +229,37 @@
         .stat-card, 
     
 
+        /* ===== 供应商配置 ===== */
+        .config-card {
+            background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04);
+            border-radius: 10px; padding: 16px; margin-bottom: 12px;
+        }
+        .config-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+        .config-card-title { font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+        .config-card-title .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+        .config-card-title .status-dot.online { background: #10b981; box-shadow: 0 0 6px rgba(16,185,129,0.5); }
+        .config-card-title .status-dot.offline { background: #ef4444; }
+        .config-field { margin-bottom: 12px; }
+        .config-field label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .config-field input, .config-field select {
+            width: 100%; padding: 8px 12px; background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;
+            color: var(--text-primary); font-size: 14px; font-family: 'JetBrains Mono', 'Consolas', monospace;
+        }
+        .config-field input:focus { outline: none; border-color: var(--accent-1); }
+        .config-field .field-hint { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+        .config-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.04); }
+        .config-test-result { margin-top: 8px; padding: 8px 12px; border-radius: 6px; font-size: 13px; display: none; }
+        .config-test-result.show { display: block; }
+        .config-test-result.success { background: rgba(16,185,129,0.1); color: #10b981; }
+        .config-test-result.error { background: rgba(239,68,68,0.1); color: #ef4444; }
+        .config-test-result.loading { background: rgba(99,102,241,0.1); color: var(--accent-1); }
+        .model-select-list { max-height: 200px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; margin-top: 8px; display: none; }
+        .model-select-item { padding: 8px 12px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.03); font-size: 13px; display: flex; justify-content: space-between; }
+        .model-select-item:hover { background: rgba(99,102,241,0.1); }
+        .model-select-item .model-name { font-weight: 600; }
+        .model-select-item .model-ctx { font-size: 11px; color: var(--text-muted); }
+
 </style>
     <link rel="stylesheet" href="theme.css?v=20260429">
     <link rel="stylesheet" href="navbar.css?v=20260429?v=20260428">
@@ -240,18 +271,10 @@
 
     <div class="main-container">
         <!-- 统计条 -->
-        <div class="stats-grid">
+        <div class="stats-grid" id="stats-grid">
             <div class="stat-card">
                 <div class="stat-value" id="stat-total-calls">--</div>
                 <div class="stat-label"><i class="fas fa-phone-alt"></i> 总调用次数</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="stat-codex-uptime">--</div>
-                <div class="stat-label"><i class="fas fa-clock"></i> Codex 运行</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="stat-he-uptime">--</div>
-                <div class="stat-label"><i class="fas fa-clock"></i> Hermes 运行</div>
             </div>
             <div class="stat-card">
                 <div class="stat-value" id="stat-model-count">--</div>
@@ -302,21 +325,8 @@
                 <!-- 按来源统计 -->
                 <div class="token-by-source-section">
                     <div class="token-by-model-title"><i class="fas fa-server"></i>按来源分布</div>
-                    <div class="token-source-bars">
-                        <div class="token-source-row">
-                            <div class="token-source-label"><i class="fas fa-robot" style="color:var(--accent-1)"></i> Codex</div>
-                            <div class="token-source-bar-wrap">
-                                <div class="token-source-bar" id="token-source-codex-bar"></div>
-                            </div>
-                            <div class="token-source-value" id="token-source-codex-value">--</div>
-                        </div>
-                        <div class="token-source-row">
-                            <div class="token-source-label"><i class="fas fa-brain" style="color:var(--accent-3)"></i> Hermes</div>
-                            <div class="token-source-bar-wrap">
-                                <div class="token-source-bar" id="token-source-he-bar"></div>
-                            </div>
-                            <div class="token-source-value" id="token-source-he-value">--</div>
-                        </div>
+                    <div class="token-source-bars" id="token-source-bars">
+                        <div style="color:var(--text-muted);font-size:12px;text-align:center;padding:8px;">加载中...</div>
                     </div>
                 </div>
                 <div class="token-by-model-title"><i class="fas fa-chart-bar"></i>按模型分布</div>
@@ -324,6 +334,18 @@
             </div>
         </div>
 
+
+        <!-- 供应商配置 -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title"><i class="fas fa-server"></i> 供应商配置</div>
+            </div>
+            <div class="card-body">
+                <div id="agent-config-list" style="display:flex;flex-direction:column;gap:16px;">
+                    <div style="color:var(--text-muted);font-size:13px;text-align:center;padding:20px;">加载中...</div>
+                </div>
+            </div>
+        </div>
         <!-- 模型切换 -->
         <div class="card">
             <div class="card-header">
@@ -355,6 +377,83 @@
 
     <script>
         const API_HOST = window.location.origin;
+        // ─── 供应商配置 ───
+        let _agentConfigs = {};
+
+        async function loadAgentConfigs() {
+            try {
+                const r = await fetch(API_HOST + '/api/agent_config');
+                _agentConfigs = await r.json();
+                if (_agentConfigs.success === false && _agentConfigs.status === 'unauthorized') {
+                    const c = document.getElementById('agent-config-list');
+                    if (c) c.innerHTML = '<div style="color:var(--text-muted);font-size:13px;text-align:center;padding:20px;"><i class="fas fa-lock"></i> 请先登录后查看和编辑供应商配置</div>';
+                    return;
+                }
+                renderAgentConfigForms();
+            } catch(e) {
+                const c = document.getElementById('agent-config-list');
+                if (c) c.innerHTML = '<div style="color:var(--accent-6);font-size:13px;text-align:center;padding:20px;">加载失败: ' + e.message + '</div>';
+            }
+        }
+
+        function renderAgentConfigForms() {
+            const container = document.getElementById('agent-config-list');
+            if (!container) return;
+            let html = '';
+            for (const [agentId, cfg] of Object.entries(_agentConfigs)) {
+                if (cfg.error) continue;
+                const dot = cfg.config_exists ? '<span class="status-dot online"></span>' : '<span class="status-dot offline"></span>';
+                html += `<div class="config-card">
+                    <div class="config-card-header">
+                        <div class="config-card-title">${dot} ${escapeHtml(cfg.label || agentId)}</div>
+                        <span style="font-size:11px;color:var(--text-muted);">${cfg.config_exists ? '配置已加载' : '无配置文件'}</span>
+                    </div>
+                    <div class="config-field"><label>Base URL</label><input type="text" id="cfg-base_url-${agentId}" value="${escapeHtml(cfg.base_url || '')}" placeholder="https://api.example.com/v1"></div>
+                    <div class="config-field"><label>API Key</label><input type="password" id="cfg-api_key-${agentId}" value="${escapeHtml(cfg.api_key || '')}" placeholder="sk-..."></div>
+                    <div class="config-field"><label>供应商名称</label><input type="text" id="cfg-provider-${agentId}" value="${escapeHtml(cfg.provider || '')}" placeholder="如: openai, sub2"></div>
+                    <div class="config-field"><label>模型</label><input type="text" id="cfg-model-${agentId}" value="${escapeHtml(cfg.model || '')}" placeholder="模型 ID"></div>
+                    <div class="config-test-result" id="test-result-${agentId}"></div>
+                    <div class="config-actions">
+                        <button class="btn btn-primary btn-sm" onclick="testConnection('${agentId}')"><i class="fas fa-plug"></i> 测试</button>
+                        <button class="btn btn-success btn-sm" onclick="saveAgentConfig('${agentId}')"><i class="fas fa-save"></i> 保存</button>
+                    </div>
+                </div>`;
+            }
+            container.innerHTML = html || '<div style="color:var(--text-muted);font-size:13px;text-align:center;padding:20px;">无可配置智能体</div>';
+        }
+
+        async function testConnection(agentId) {
+            const baseUrl = document.getElementById('cfg-base_url-' + agentId).value.trim();
+            const apiKey = document.getElementById('cfg-api_key-' + agentId).value.trim();
+            const el = document.getElementById('test-result-' + agentId);
+            if (!baseUrl) { el.className = 'config-test-result show error'; el.textContent = '请输入 Base URL'; return; }
+            el.className = 'config-test-result show loading'; el.textContent = '连接中...';
+            try {
+                const p = new URLSearchParams({base_url: baseUrl, api_key: apiKey});
+                const r = await fetch(API_HOST + '/api/agent_config/fetch_models?' + p.toString());
+                const d = await r.json();
+                el.className = 'config-test-result show ' + (d.success ? 'success' : 'error');
+                el.textContent = d.success ? '✅ 连接成功，' + d.count + ' 个模型' : '❌ ' + (d.error || '失败');
+            } catch(e) { el.className = 'config-test-result show error'; el.textContent = '❌ ' + e.message; }
+        }
+
+        async function saveAgentConfig(agentId) {
+            const body = {agent_id: agentId};
+            body.base_url = document.getElementById('cfg-base_url-' + agentId).value.trim();
+            body.api_key = document.getElementById('cfg-api_key-' + agentId).value.trim();
+            body.model_provider = document.getElementById('cfg-provider-' + agentId).value.trim();
+            body.model = document.getElementById('cfg-model-' + agentId).value.trim();
+            const el = document.getElementById('test-result-' + agentId);
+            el.className = 'config-test-result show loading'; el.textContent = '保存中...';
+            try {
+                const r = await fetch(API_HOST + '/api/agent_config/update', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+                const d = await r.json();
+                el.className = 'config-test-result show ' + (d.success ? 'success' : 'error');
+                el.textContent = d.success ? '✅ ' + (d.message || '已保存') : '❌ ' + (d.error || '失败');
+                if (d.success) setTimeout(loadAgentConfigs, 1000);
+            } catch(e) { el.className = 'config-test-result show error'; el.textContent = '❌ ' + e.message; }
+        }
+
         function formatCallCount(n) {
             return n.toLocaleString('zh-CN') + '次';
         }
@@ -373,20 +472,10 @@
             const text = String(value || '');
             return /^[a-z0-9 -]+$/i.test(text) ? text : fallback;
         }
-        let modelMap = {}, availableModels = [], agentModels = { codex: null, hermes: null }, tokenData = null, currentTokenPeriod = '1h';
+        let modelMap = {}, availableModels = [], agentModels = {}, tokenData = null, currentTokenPeriod = '1h';
 
         function normalizeAgentModels(models) {
-            const next = models || {};
-            return {
-                ...next,
-                codex: next.codex || null,
-                hermes: next.hermes || null
-            };
-        }
-
-        function getCodexModel(models) {
-            const normalized = normalizeAgentModels(models || agentModels);
-            return normalized.codex || null;
+            return models || {};
         }
 
         async function loadModels() {
@@ -467,85 +556,57 @@
                     });
                 }
                 const d = statusRes, agents = d.agents || {}, ms = d.model_stats || {};
-                const codex = agents.codex || {}, he = agents.hermes || {};
                 // 使用 api_monitor 的真实调用次数和响应时间
                 const totalCalls = realTotalCalls;
-                // 从 call_stats 获取各智能体的真实调用次数
-                const codexBySource = (callStats.by_source || {}).codex || {};
-                const heBySource = (callStats.by_source || {}).hermes || {};
-                const codexCalls = codexBySource.calls || 0;
-                const heCalls = heBySource.calls || 0;
-                // 真实运行状态
-                const codexOnline = codex.running || false;
-                const heOnline = he.running || false;
-                const codexUptime = codex.uptime_seconds || 0;
-                const heUptime = he.uptime_seconds || 0;
                 // 更新统计条
                 document.getElementById('stat-total-calls').textContent = formatCallCount(totalCalls);
-                document.getElementById('stat-codex-uptime').textContent = fmtUptime(codexUptime);
-                document.getElementById('stat-he-uptime').textContent = fmtUptime(heUptime);
+                // 动态更新所有智能体运行时长卡片
+                updateAgentUptimeCards(agents);
                 document.getElementById('stat-model-count').textContent = (availableModels || []).length + '个';
-                updateAgentCards(codexCalls, heCalls, codexOnline, heOnline, codexUptime, heUptime);
-                updateModelList(ms.model_id || getCodexModel(agentModels) || 'LongCat-2.0-Preview');
+                updateAgentCardsDynamic(agents, callStats);
+                updateModelList(ms.model_id || Object.values(agentModels)[0] || 'LongCat-2.0-Preview');
                 addLog('success', `刷新成功 | 调用${formatCallCount(totalCalls)}`);
             } catch(e) { addLog('error', '刷新失败: ' + e.message); }
         }
-        function updateAgentCards(codexCalls, heCalls, codexOnline, heOnline, codexUptime, heUptime) {
-            const codexModel = getCodexModel(agentModels) || 'LongCat-2.0-Preview';
-            const heModel = agentModels.hermes || codexModel;
-            const codexInfo = getModelInfo(codexModel), heInfo = getModelInfo(heModel);
-            const codexSwitchBtns = availableModels.map(m => {
-                const isCurrent = codexModel.includes(m.id) || m.id.includes(codexModel.split('/').pop());
-                if (isCurrent) return `<button class="btn btn-primary btn-sm" disabled><i class="fas fa-check"></i> 当前</button>`;
-                return `<button class="btn btn-success btn-sm" onclick='NexusAuth.requireAuth(function(){switchAgentModel("codex", ${jsArg(m.id)})})'><i class="fas fa-exchange-alt"></i> ${escapeHtml(m.name)}</button>`;
-            }).join(' ');
-            const heSwitchBtns = availableModels.map(m => {
-                const isCurrent = heModel.includes(m.id) || m.id.includes(heModel.split('/').pop());
-                if (isCurrent) return `<button class="btn btn-primary btn-sm" disabled><i class="fas fa-check"></i> 当前</button>`;
-                return `<button class="btn btn-success btn-sm" onclick='NexusAuth.requireAuth(function(){switchAgentModel("hermes", ${jsArg(m.id)})})'><i class="fas fa-exchange-alt"></i> ${escapeHtml(m.name)}</button>`;
-            }).join(' ');
-            const codexStatusText = codexOnline ? '运行中' : '已停止';
-            const heStatusText = heOnline ? '运行中' : '已停止';
-            const codexStatusColor = codexOnline ? 'var(--accent-3)' : 'var(--accent-1)';
-            const heStatusColor = heOnline ? 'var(--accent-3)' : 'var(--accent-1)';
-            document.getElementById('agents-grid').innerHTML = `
-                <div class="agent-card">
-                    <div class="agent-header">
-                        <div class="agent-avatar red">C</div>
-                        <div>
-                            <div class="agent-name">Codex</div>
-                            <div class="agent-role">主智能体 · <span style="color:${codexStatusColor}">${codexStatusText}</span> · ${escapeHtml(fmtUptime(codexUptime))}</div>
-                        </div>
-                    </div>
-                    <div class="agent-stats">
-                        <div class="agent-stat"><div class="agent-stat-val">${escapeHtml(formatCallCount(codexCalls))}</div><div class="agent-stat-label">调用次数</div></div>
-                        <div class="agent-stat"><div class="agent-stat-val" style="color:${codexStatusColor}">${codexStatusText}</div><div class="agent-stat-label">运行状态</div></div>
-                    </div>
-                    <div class="agent-model-section">
-                        <div class="agent-model-label"><i class="fas fa-microchip"></i>当前模型：<span class="agent-model-name">${escapeHtml(codexInfo.name)}</span></div>
-                        <div class="agent-model-detail">${escapeHtml(codexInfo.provider)} · 上下文 ${escapeHtml(codexInfo.context)}</div>
-                        <div class="agent-switch-btns">${codexSwitchBtns}</div>
-                    </div>
-                </div>
-                <div class="agent-card">
-                    <div class="agent-header">
-                        <div class="agent-avatar blue">H</div>
-                        <div>
-                            <div class="agent-name">Hermes</div>
-                            <div class="agent-role">辅助智能体 · <span style="color:${heStatusColor}">${heStatusText}</span> · ${escapeHtml(fmtUptime(heUptime))}</div>
-                        </div>
-                    </div>
-                    <div class="agent-stats">
-                        <div class="agent-stat"><div class="agent-stat-val">${escapeHtml(formatCallCount(heCalls))}</div><div class="agent-stat-label">调用次数</div></div>
-                        <div class="agent-stat"><div class="agent-stat-val" style="color:${heStatusColor}">${heStatusText}</div><div class="agent-stat-label">运行状态</div></div>
-                    </div>
-                    <div class="agent-model-section">
-                        <div class="agent-model-label"><i class="fas fa-microchip"></i>当前模型：<span class="agent-model-name">${escapeHtml(heInfo.name)}</span></div>
-                        <div class="agent-model-detail">${escapeHtml(heInfo.provider)} · 上下文 ${escapeHtml(heInfo.context)}</div>
-                        <div class="agent-switch-btns">${heSwitchBtns}</div>
-                    </div>
-                </div>`;
+        function updateAgentUptimeCards(agents) {
+            const grid = document.getElementById('stats-grid');
+            if (!grid) return;
+            grid.querySelectorAll('.agent-uptime-card').forEach(el => el.remove());
+            for (const [aid, info] of Object.entries(agents)) {
+                if (!info || typeof info !== 'object') continue;
+                const card = document.createElement('div');
+                card.className = 'stat-card agent-uptime-card';
+                card.innerHTML = '<div class="stat-value">' + fmtUptime(info.uptime_seconds || 0) + '</div><div class="stat-label"><i class="fas fa-clock"></i> ' + escapeHtml(info.name || aid) + ' 运行</div>';
+                grid.appendChild(card);
+            }
         }
+
+        function updateAgentCardsDynamic(agents, callStats) {
+            const grid = document.getElementById('agents-grid');
+            if (!grid) return;
+            const entries = Object.entries(agents);
+            if (entries.length === 0) { grid.innerHTML = '<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:16px;grid-column:1/-1;">暂无数据</div>'; return; }
+            const colors = ['red','blue','purple','cyan','amber','green'];
+            const bySource = (callStats && callStats.by_source) || {};
+            let html = '';
+            entries.forEach(([aid, info], idx) => {
+                const name = info.name || aid;
+                const color = colors[idx % colors.length];
+                const online = info.running || false;
+                const statusColor = online ? 'var(--accent-4)' : 'var(--accent-6)';
+                const calls = (bySource[aid] || {}).calls || 0;
+                const model = agentModels[aid] || info.model || '';
+                const mi = getModelInfo(model);
+                const btns = availableModels.map(m => {
+                    const cur = model.includes(m.id) || m.id.includes((model||'').split('/').pop());
+                    if (cur) return '<button class="btn btn-primary btn-sm" disabled><i class="fas fa-check"></i> 当前</button>';
+                    return '<button class="btn btn-success btn-sm" onclick=\'NexusAuth.requireAuth(function(){switchAgentModel(' + jsArg(aid) + ',' + jsArg(m.id) + ')})\'><i class="fas fa-exchange-alt"></i> ' + escapeHtml(m.name) + '</button>';
+                }).join(' ');
+                html += '<div class="agent-card"><div class="agent-header"><div class="agent-avatar ' + color + '">' + name.charAt(0).toUpperCase() + '</div><div><div class="agent-name">' + escapeHtml(name) + '</div><div class="agent-role">智能体 · <span style="color:' + statusColor + '">' + (online ? '运行中' : '已停止') + '</span> · ' + escapeHtml(fmtUptime(info.uptime_seconds || 0)) + '</div></div></div><div class="agent-stats"><div class="agent-stat"><div class="agent-stat-val">' + formatCallCount(calls) + '</div><div class="agent-stat-label">调用次数</div></div><div class="agent-stat"><div class="agent-stat-val" style="color:' + statusColor + '">' + (online ? '运行中' : '已停止') + '</div><div class="agent-stat-label">运行状态</div></div></div><div class="agent-model-section"><div class="agent-model-label"><i class="fas fa-microchip"></i>当前模型：<span class="agent-model-name">' + escapeHtml(mi.name) + '</span></div><div class="agent-model-detail">' + escapeHtml(mi.provider) + ' · 上下文 ' + escapeHtml(mi.context) + '</div><div class="agent-switch-btns">' + btns + '</div></div></div>';
+            });
+            grid.innerHTML = html;
+        }
+
         function updateModelList(currentModelId) {
             const groups = {};
             availableModels.forEach(m => {
@@ -592,7 +653,6 @@
         }
         function renderTokenStats() {
             if (!tokenData) return;
-            // 新 API 直接返回当前 period 的数据（不需要再取 sub-key）
             const d = tokenData;
             const input = d.total_input || d.input || 0;
             const output = d.total_output || d.output || 0;
@@ -601,30 +661,40 @@
             document.getElementById('token-output').textContent = formatTokenNum(output);
             document.getElementById('token-total').textContent = formatTokenNum(total);
 
-            // 按来源分布
+            // 按来源分布 - 动态渲染
             const bySource = tokenData.by_source || tokenData.bySource || {};
-            const codexData = bySource.codex || {};
-            const heData = bySource.hermes || {};
-            const codexTotal = (codexData.total || codexData.tokens || (codexData.input + codexData.output) || 0);
-            const heTotal = (heData.total || heData.tokens || (heData.input + heData.output) || 0);
-            const grandTotal = codexTotal + heTotal;
-            const codexPct = grandTotal > 0 ? Math.round(codexTotal / grandTotal * 100) : 0;
-            const hePct = grandTotal > 0 ? Math.round(heTotal / grandTotal * 100) : 0;
-
-            const codexBar = document.getElementById('token-source-codex-bar');
-            const heBar = document.getElementById('token-source-he-bar');
-            if (codexBar) { codexBar.style.width = codexPct + '%'; codexBar.style.background = 'linear-gradient(90deg, var(--accent-1), var(--accent-2))'; }
-            if (heBar) { heBar.style.width = hePct + '%'; heBar.style.background = 'linear-gradient(90deg, var(--accent-3), var(--accent-4))'; }
-            const codexVal = document.getElementById('token-source-codex-value');
-            const heVal = document.getElementById('token-source-he-value');
-            if (codexVal) codexVal.textContent = formatTokenNum(codexTotal) + ' (' + codexPct + '%)';
-            if (heVal) heVal.textContent = formatTokenNum(heTotal) + ' (' + hePct + '%)';
+            const container = document.getElementById('token-source-bars');
+            const sourceEntries = Object.entries(bySource);
+            if (sourceEntries.length === 0) {
+                container.innerHTML = '<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:8px;">暂无数据</div>';
+            } else {
+                const grandTotal = sourceEntries.reduce((s, [,v]) => s + (v.total || v.tokens || (v.input + v.output) || 0), 0);
+                const colors = [
+                    ['var(--accent-1)', 'var(--accent-2)'],
+                    ['var(--accent-3)', 'var(--accent-4)'],
+                    ['var(--accent-5)', 'var(--accent-6)'],
+                ];
+                const icons = ['fa-robot', 'fa-brain', 'fa-microchip', 'fa-server'];
+                let html = '';
+                sourceEntries.forEach(([src, stats], idx) => {
+                    const t = stats.total || stats.tokens || ((stats.input||0) + (stats.output||0)) || 0;
+                    const pct = grandTotal > 0 ? Math.round(t / grandTotal * 100) : 0;
+                    const c = colors[idx % colors.length];
+                    const ic = icons[idx % icons.length];
+                    html += '<div class="token-source-row">' +
+                        '<div class="token-source-label"><i class="fas ' + ic + '" style="color:' + c[0] + '"></i> ' + escapeHtml(src) + '</div>' +
+                        '<div class="token-source-bar-wrap"><div class="token-source-bar" style="width:' + pct + '%;background:linear-gradient(90deg,' + c[0] + ',' + c[1] + ')"></div></div>' +
+                        '<div class="token-source-value">' + formatTokenNum(t) + ' (' + pct + '%)</div>' +
+                        '</div>';
+                });
+                container.innerHTML = html;
+            }
 
             // 按模型分布
             const byModel = tokenData.by_model || tokenData.byModel || {};
-            const container = document.getElementById('token-by-model');
+            const modelContainer = document.getElementById('token-by-model');
             const models = Object.entries(byModel);
-            if (models.length === 0) { container.innerHTML = '<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:16px;">暂无数据</div>'; return; }
+            if (models.length === 0) { modelContainer.innerHTML = '<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:16px;">暂无数据</div>'; return; }
             const maxTotal = Math.max(...models.map(m => m[1].total || (m[1].input + m[1].output) || 0));
             let html = '';
             models.forEach(([model, stats]) => {
@@ -642,7 +712,7 @@
                 </div>`;
             });
             html += `<div class="token-legend"><div class="token-legend-item"><div class="token-legend-color" style="background:linear-gradient(135deg,var(--accent-1),var(--accent-2))"></div>输入Token</div><div class="token-legend-item"><div class="token-legend-color" style="background:linear-gradient(135deg,var(--accent-3),var(--accent-4))"></div>输出Token</div></div>`;
-            container.innerHTML = html;
+            modelContainer.innerHTML = html;
         }
         function fetchTokenStats() {
             const period = currentTokenPeriod || 'all';
@@ -700,8 +770,7 @@
         }
         // SSE 实时更新：更新 models.html 中所有动态数据
         function updateFromSSE(data) {
-            const codex = (data.agents || {}).codex || {};
-            const he = (data.agents || {}).hermes || {};
+            const agents = data.agents || {};
             const ms = data.model_stats || {};
             // 统计条 - 总调用次数
             if (ms.total_calls !== undefined) {
@@ -709,15 +778,7 @@
                 if (el) el.textContent = (ms.total_calls || 0).toLocaleString('zh-CN') + '次';
             }
             // 统计条 - Codex 运行时长
-            if (codex.uptime_seconds !== undefined) {
-                const el = document.getElementById('stat-codex-uptime');
-                if (el) el.textContent = fmtUptime(codex.uptime_seconds);
-            }
-            // 统计条 - Hermes 运行时长
-            if (he.uptime_seconds !== undefined) {
-                const el = document.getElementById('stat-he-uptime');
-                if (el) el.textContent = fmtUptime(he.uptime_seconds);
-            }
+            updateAgentUptimeCards(agents);
             // 更新模型列表中的"使用中"标记
             if (ms.model_id) {
                 updateModelList(ms.model_id);
@@ -736,6 +797,7 @@
         }
 
         loadModels().then(() => { refreshData(); connectModelsSSE(); });
+        loadAgentConfigs();
         fetchTokenStats();
         setInterval(fetchTokenStats, 30000);
         // 每2分钟自动刷新一次数据和日志

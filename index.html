@@ -147,51 +147,7 @@
             </div>
         </div>
 
-        <!-- Codex 智能体卡片 -->
-        <div class="card">
-            <div class="card-header">
-                <div class="card-title"><i class="fas fa-robot"></i> Codex 智能体</div>
-            </div>
-            <div class="card-body">
-                <div class="info-grid">
-                    <div class="info-card">
-                        <div class="info-row"><span class="info-key">运行状态</span><span class="info-val" id="codex-status">--</span></div>
-                        <div class="info-row"><span class="info-key">CPU使用率</span><span class="info-val" id="codex-cpu">--</span></div>
-                        <div class="info-row"><span class="info-key">内存使用率</span><span class="info-val" id="codex-memory">--</span></div>
-                        <div class="info-row"><span class="info-key">内存占用</span><span class="info-val" id="codex-mem-mb">--</span></div>
-                    </div>
-                    <div class="info-card">
-                        <div class="info-row"><span class="info-key">网络入站</span><span class="info-val" id="codex-net-in">--</span></div>
-                        <div class="info-row"><span class="info-key">网络出站</span><span class="info-val" id="codex-net-out">--</span></div>
-                        <div class="info-row"><span class="info-key">当前模型</span><span class="info-val highlight" id="codex-model">--</span></div>
-                        <div class="info-row"><span class="info-key">API调用</span><span class="info-val" id="codex-calls">--</span></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Hermes 智能体卡片 -->
-        <div class="card">
-            <div class="card-header">
-                <div class="card-title"><i class="fas fa-brain"></i> Hermes 智能体</div>
-            </div>
-            <div class="card-body">
-                <div class="info-grid">
-                    <div class="info-card">
-                        <div class="info-row"><span class="info-key">运行状态</span><span class="info-val" id="hermes-status">--</span></div>
-                        <div class="info-row"><span class="info-key">CPU使用率</span><span class="info-val" id="hermes-cpu">--</span></div>
-                        <div class="info-row"><span class="info-key">内存使用率</span><span class="info-val" id="hermes-memory">--</span></div>
-                        <div class="info-row"><span class="info-key">内存占用</span><span class="info-val" id="hermes-mem-mb">--</span></div>
-                    </div>
-                    <div class="info-card">
-                        <div class="info-row"><span class="info-key">网络入站</span><span class="info-val" id="hermes-net-in">--</span></div>
-                        <div class="info-row"><span class="info-key">网络出站</span><span class="info-val" id="hermes-net-out">--</span></div>
-                        <div class="info-row"><span class="info-key">当前模型</span><span class="info-val highlight" id="hermes-model">--</span></div>
-                        <div class="info-row"><span class="info-key">API调用</span><span class="info-val" id="hermes-calls">--</span></div>
-                    </div>
-                </div>
-            </div>
-        </div>
+                <div id="agent-cards-container"></div>
     </div>
 
     <script>
@@ -261,43 +217,84 @@
             }
         }
         
+        // 智能体 ID → 图标映射（动态）
+        function agentIcon(agentId) {
+            const icons = { 'openclaw': 'fa-robot', 'codex': 'fa-code' };
+            return icons[agentId] || 'fa-microchip';
+        }
+
+        // 动态生成智能体卡片
+        function renderAgentCards(agents) {
+            const container = document.getElementById('agent-cards-container');
+            if (!container) return;
+            if (container.children.length === 0) {
+                let html = '';
+                for (const [agentId, info] of Object.entries(agents || {})) {
+                    const label = info.name || agentId;
+                    const icon = agentIcon(agentId);
+                    html += `
+        <div class="card agent-card" data-agent="${agentId}">
+            <div class="card-header">
+                <div class="card-title"><i class="fas ${icon}"></i> ${label} 智能体</div>
+            </div>
+            <div class="card-body">
+                <div class="info-grid">
+                    <div class="info-card">
+                        <div class="info-row"><span class="info-key">运行状态</span><span class="info-val" id="${agentId}-status">--</span></div>
+                        <div class="info-row"><span class="info-key">CPU使用率</span><span class="info-val" id="${agentId}-cpu">--</span></div>
+                        <div class="info-row"><span class="info-key">内存使用率</span><span class="info-val" id="${agentId}-memory">--</span></div>
+                        <div class="info-row"><span class="info-key">内存占用</span><span class="info-val" id="${agentId}-mem-mb">--</span></div>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-row"><span class="info-key">网络入站</span><span class="info-val" id="${agentId}-net-in">--</span></div>
+                        <div class="info-row"><span class="info-key">网络出站</span><span class="info-val" id="${agentId}-net-out">--</span></div>
+                        <div class="info-row"><span class="info-key">当前模型</span><span class="info-val highlight" id="${agentId}-model">--</span></div>
+                        <div class="info-row"><span class="info-key">API调用</span><span class="info-val" id="${agentId}-calls">--</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+                }
+                container.innerHTML = html;
+            }
+        }
+        
         function updateDashboard(data) {
                     const sys = data.system_info || {};
                     const agents = data.agents || {};
-                    const codex = agents.codex || {};
-                    const he = agents.hermes || {};
                     const ms = data.model_stats || {};
                     
-                    // 统计条 - CPU
+                    // 统计条
                     document.getElementById('stat-cpu').textContent = formatPercent(sys.total_cpu);
                     document.getElementById('stat-cpu-detail').textContent = '负载: ' + (sys.load_avg || '--');
-                    
-                    // 统计条 - 内存
                     document.getElementById('stat-memory').textContent = formatPercent(sys.total_memory);
                     document.getElementById('stat-mem-detail').textContent = formatGbPair(sys.mem_used_gb, sys.mem_total_gb);
-                    
-                    // 统计条 - 磁盘
                     document.getElementById('stat-disk').textContent = formatPercent(sys.total_disk);
                     document.getElementById('stat-disk-detail').textContent = formatGbPair(sys.disk_used_gb, sys.disk_total_gb);
-                    
-                    // 统计条 - 服务器运行时间
                     document.getElementById('stat-uptime').textContent = formatUptime(sys.server_uptime_seconds || 0);
                     document.getElementById('stat-load').textContent = '负载: ' + (sys.load_avg || '--');
-                    
-                    // Codex
-                    const codexStatus = codex.status || 'unknown';
-                    const codexStatusEl = document.getElementById('codex-status');
-                    codexStatusEl.textContent = statusText(codexStatus);
-                    setStatusColor(codexStatusEl, codexStatus);
-                    
-                    document.getElementById('codex-cpu').textContent = formatPercent(codex.cpu_usage);
-                    document.getElementById('codex-memory').textContent = formatPercent(codex.memory_usage);
-                    document.getElementById('codex-mem-mb').textContent = formatMb(codex.mem_mb);
-                    document.getElementById('codex-net-in').textContent = formatNetworkSpeed(codex.network_in || 0);
-                    document.getElementById('codex-net-out').textContent = formatNetworkSpeed(codex.network_out || 0);
-                    // 当前模型从 model_stats 读取（显示真实 model_id）
-                    document.getElementById('codex-model').textContent = ms.model_id || codex.model || '--';
-                    document.getElementById('codex-calls').textContent = codex.api_calls || 0;
+
+                    // 动态生成卡片（首次）并更新所有智能体数据
+                    renderAgentCards(agents);
+                    for (const [agentId, info] of Object.entries(agents)) {
+                        const setStatus = (field, value) => {
+                            const el = document.getElementById(agentId + '-' + field);
+                            if (el) el.textContent = value;
+                        };
+                        const status = info.status || 'unknown';
+                        const statusEl = document.getElementById(agentId + '-status');
+                        if (statusEl) {
+                            statusEl.textContent = statusText(status);
+                            setStatusColor(statusEl, status);
+                        }
+                        setStatus('cpu', formatPercent(info.cpu_usage));
+                        setStatus('memory', formatPercent(info.memory_usage));
+                        setStatus('mem-mb', formatMb(info.mem_mb));
+                        setStatus('net-in', formatNetworkSpeed(info.network_in || 0));
+                        setStatus('net-out', formatNetworkSpeed(info.network_out || 0));
+                        setStatus('model', ms.model_id || info.model || '--');
+                        setStatus('calls', info.api_calls || 0);
+                    }
                     
                     // 面板信息
                     const pi = data.panel_info || {};
@@ -307,22 +304,7 @@
                     document.getElementById('panel-update-date').textContent = pi.update_date || '--';
                     document.getElementById('panel-disk').textContent = formatPercent(sys.total_disk);
                     document.getElementById('panel-network').textContent = '↓' + formatNetworkSpeed(sys.total_network_in || 0) + ' ↑' + formatNetworkSpeed(sys.total_network_out || 0);
-                    
-                    // Hermes
-                    const heStatus = he.status || 'unknown';
-                    const heStatusEl = document.getElementById('hermes-status');
-                    heStatusEl.textContent = statusText(heStatus);
-                    setStatusColor(heStatusEl, heStatus);
-                    
-                    document.getElementById('hermes-cpu').textContent = formatPercent(he.cpu_usage);
-                    document.getElementById('hermes-memory').textContent = formatPercent(he.memory_usage);
-                    document.getElementById('hermes-mem-mb').textContent = formatMb(he.mem_mb);
-                    document.getElementById('hermes-net-in').textContent = formatNetworkSpeed(he.network_in || 0);
-                    document.getElementById('hermes-net-out').textContent = formatNetworkSpeed(he.network_out || 0);
-                    // Hermes 当前模型
-                    document.getElementById('hermes-model').textContent = he.model || '--';
-                    document.getElementById('hermes-calls').textContent = he.api_calls || 0;
-        }
+                }
 
         // SSE 实时推送（主数据源）+ 轮询 fallback
         let sseConnected = false;
@@ -362,8 +344,6 @@
                 const idMap = {
                     'oc': { 'cpu_usage': 'codex-cpu', 'memory_usage': 'codex-memory', 'status': 'codex-status', 'model': 'codex-model', 'api_calls': 'codex-calls' },
                     'codex': { 'cpu_usage': 'codex-cpu', 'memory_usage': 'codex-memory', 'status': 'codex-status', 'model': 'codex-model', 'api_calls': 'codex-calls' },
-                    'he': { 'cpu_usage': 'hermes-cpu', 'memory_usage': 'hermes-memory', 'status': 'hermes-status', 'model': 'hermes-model', 'api_calls': 'hermes-calls' },
-                    'hermes': { 'cpu_usage': 'hermes-cpu', 'memory_usage': 'hermes-memory', 'status': 'hermes-status', 'model': 'hermes-model', 'api_calls': 'hermes-calls' }
                 };
                 const elId = idMap[agent] && idMap[agent][field];
                 if (elId) {

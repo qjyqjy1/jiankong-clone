@@ -11,6 +11,7 @@
     var navItems = [
         { path: 'index.html',    icon: 'fa-th-large',  label: '仪表盘' },
         { path: 'models.html',   icon: 'fa-cube',      label: '模型管理' },
+        { path: 'files.html',    icon: 'fa-folder-open', label: '文件管理' },
         { path: 'sessions.html', icon: 'fa-comments',  label: '会话管理' },
         { path: 'skills.html',   icon: 'fa-puzzle-piece', label: '技能管理' },
         { path: 'systems.html',  icon: 'fa-server',    label: '智能系统' },
@@ -43,6 +44,8 @@
                     '<i class="fas fa-moon icon-moon"></i>' +
                 '</button>' +
                 '<div class="navbar-status"><div class="pulse"></div>系统运行中</div>' +
+                '<button class="btn btn-ghost btn-sm" id="navLoginBtn" onclick="NexusAuth.showLogin()" style="display:none;"><i class="fas fa-sign-in-alt"></i> 登录</button>' +
+                '<button class="btn btn-ghost btn-sm" id="navLogoutBtn" onclick="NexusAuth.logout()" style="display:none;"><i class="fas fa-sign-out-alt"></i> 登出</button>' +
                 '<button class="hamburger" id="hamburgerBtn" title="菜单">' +
                     '<i class="fas fa-bars"></i>' +
                 '</button>' +

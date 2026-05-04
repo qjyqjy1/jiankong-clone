@@ -160,57 +160,7 @@
         <div class="timeline" id="timeline"></div>
     </div>
 
-    <script>
-    // ========== 智能体面板更新日志（静态数据）==========
-    // 只记录与智能体面板直接相关的更新
-    // 添加新版本时，在 entries 数组开头插入
-    // 类型：新功能 / 修复 / 界面 / 优化 / 重构 / 性能
-    const CHANGELOG_DATA = {
-        "entries": [
-            {
-                "version": "v1.3.0",
-                "date": "2026-04-30",
-                "changes": [
-                    {"type": "修复", "desc": "模型列表不再从 provider 拉全量，只展示 agent 实际配置的模型"},
-                    {"type": "修复", "desc": "agent_model_lists 正确填充，切换模型按钮正常显示"},
-                    {"type": "修复", "desc": "系统信息（CPU/内存/磁盘/网络）使用 psutil 读取真实数据"},
-                    {"type": "修复", "desc": "会话列表从 /root/.codex/sessions/ 扫描真实 rollout 文件"},
-                    {"type": "修复", "desc": "技能列表从 /root/.hermes/skills/ 扫描 SKILL.md frontmatter"},
-                    {"type": "修复", "desc": "服务列表从 systemctl running 检测真实运行中的服务"},
-                    {"type": "修复", "desc": "调用统计从 logs_2.sqlite 读取真实日志记录数"},
-                    {"type": "修复", "desc": "替换版本日志为本项目自己的更新记录"}
-                ]
-            },
-            {
-                "version": "v1.2.0",
-                "date": "2026-04-30",
-                "changes": [
-                    {"type": "新功能", "desc": "新增 /api/stats 汇总端点"},
-                    {"type": "新功能", "desc": "check_session 返回 balance_gold 余额信息"},
-                    {"type": "修复", "desc": "前端 refreshDashboard 并行请求提速"},
-                    {"type": "修复", "desc": "aiGenerateOne 不再自动 recordSent，只有真正发布才记录"},
-                    {"type": "修复", "desc": "loadQbank 正确解析 data.items"},
-                    {"type": "修复", "desc": "discoverForm 展示返回的表单字段列表"},
-                    {"type": "修复", "desc": "发布成功后自动刷新 dashboard"}
-                ]
-            },
-            {
-                "version": "v1.1.0",
-                "date": "2026-04-29",
-                "changes": [
-                    {"type": "新功能", "desc": "小猪智能体面板初版上线（端口1234）"},
-                    {"type": "新功能", "desc": "仪表盘页面：系统状态/实时日志/SSE推送"},
-                    {"type": "新功能", "desc": "模型管理页面：展示可用模型/切换模型/调用统计"},
-                    {"type": "新功能", "desc": "会话管理页面：展示 Codex 会话列表"},
-                    {"type": "新功能", "desc": "技能管理页面：展示已安装技能/安装卸载"},
-                    {"type": "新功能", "desc": "智能系统页面：服务监控/项目管理"},
-                    {"type": "新功能", "desc": "上游代理模式：优先请求上游服务，不可用时本地生成数据"}
-                ]
-            }
-        ]
-    };
-    // ==================================================
-
+    <script>    const API_HOST = window.location.origin;
     const TYPE_LABELS = {
         '新功能': 'feature', '修复': 'fix',
         '界面': 'ui', '优化': 'enhancement',
@@ -222,43 +172,48 @@
         return d.innerHTML;
     }
 
-    // 直接渲染，无需API请求
-    (function renderChangelog() {
-        const entries = CHANGELOG_DATA.entries || [];
+    // 从 API 加载更新日志
+    async function loadChangelog() {
+        try {
+            const resp = await fetch(API_HOST + '/api/changelog');
+            const data = await resp.json();
+            const entries = data.entries || [];
 
-        // 动态计算统计
-        let totalChanges = 0, uiChanges = 0, fixChanges = 0;
-        entries.forEach(function(entry) {
-            (entry.changes || []).forEach(function(c) {
-                totalChanges++;
-                const t = c.type || '';
-                if (t === '界面' || t === '优化' || t === '重构') uiChanges++;
-                if (t === '修复') fixChanges++;
+            let totalChanges = 0, uiChanges = 0, fixChanges = 0;
+            entries.forEach(function(entry) {
+                (entry.changes || []).forEach(function(c) {
+                    totalChanges++;
+                    const t = c.type || '';
+                    if (t === '界面' || t === '优化' || t === '重构') uiChanges++;
+                    if (t === '修复') fixChanges++;
+                });
             });
-        });
-        document.getElementById('stat-total-versions').textContent = entries.length;
-        document.getElementById('stat-total-changes').textContent = totalChanges;
-        document.getElementById('stat-ui-changes').textContent = uiChanges;
-        document.getElementById('stat-fix-changes').textContent = fixChanges;
+            document.getElementById('stat-total-versions').textContent = entries.length;
+            document.getElementById('stat-total-changes').textContent = totalChanges;
+            document.getElementById('stat-ui-changes').textContent = uiChanges;
+            document.getElementById('stat-fix-changes').textContent = fixChanges;
 
-        // 渲染时间轴
-        const timeline = document.getElementById('timeline');
-        let html = '';
-        entries.forEach(function(entry, i) {
-            const changes = entry.changes || [];
-            let itemsHtml = '';
-            changes.forEach(function(c) {
-                const typeKey = TYPE_LABELS[c.type] || 'note';
-                itemsHtml += '<li class="changelog-item"><span class="version-type ' + esc(typeKey) + '">' + esc(c.type) + '</span>' + esc(c.desc) + '</li>';
+            const timeline = document.getElementById('timeline');
+            let html = '';
+            entries.forEach(function(entry, i) {
+                const changes = entry.changes || [];
+                let itemsHtml = '';
+                changes.forEach(function(c) {
+                    const typeKey = TYPE_LABELS[c.type] || 'note';
+                    itemsHtml += '<li class="changelog-item"><span class="version-type ' + esc(typeKey) + '">' + esc(c.type) + '</span>' + esc(c.desc) + '</li>';
+                });
+                html += '<div class="version-entry" style="animation-delay:' + (i * 0.05) + 's">' +
+                    '<div class="version-header"><span class="version-number">' + esc(entry.version) + '</span><span class="version-date">' + esc(entry.date) + '</span></div>' +
+                    '<div class="version-card"><ul class="changelog-list">' + itemsHtml + '</ul></div>' +
+                '</div>';
             });
-            html += '<div class="version-entry" style="animation-delay:' + (i * 0.05) + 's">' +
-                '<div class="version-header"><span class="version-number">' + esc(entry.version) + '</span><span class="version-date">' + esc(entry.date) + '</span></div>' +
-                '<div class="version-card"><ul class="changelog-list">' + itemsHtml + '</ul></div>' +
-            '</div>';
-        });
-        timeline.innerHTML = html;
-    })();
-    </script>
+            timeline.innerHTML = html;
+        } catch(e) {
+            document.getElementById('timeline').innerHTML = '<div style="color:var(--accent-6);text-align:center;padding:40px;">加载失败: ' + e.message + '</div>';
+        }
+    }
+
+    loadChangelog();</script>
     <script src="auth.js?v=20260429"></script>
 <script src="navbar.js?v=20260429"></script>
 </body>

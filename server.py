@@ -11,8 +11,12 @@ import os
 import re
 import secrets
 import sqlite3
+import subprocess
 import time
-import tomllib
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -28,13 +32,6 @@ SSE_INTERVAL = float(os.environ.get("SSE_INTERVAL", "3"))
 SSE_UPSTREAM_TIMEOUT = float(os.environ.get("SSE_UPSTREAM_TIMEOUT", "1.5"))
 LOCAL_MODEL_TIMEOUT = float(os.environ.get("LOCAL_MODEL_TIMEOUT", "4"))
 LOCAL_MODEL_CACHE_SECONDS = float(os.environ.get("LOCAL_MODEL_CACHE_SECONDS", "45"))
-CODEX_CONFIG_PATH = Path("/root/.codex/config.toml")
-CODEX_AUTH_PATH = Path("/root/.codex/auth.json")
-CODEX_SESSIONS_DIR = Path("/root/.codex/sessions")
-CODEX_SKILLS_DIR = Path("/root/.codex/skills")
-HERMES_CONFIG_PATH = Path("/root/.hermes/config.yaml")
-HERMES_SKILLS_DIR = Path("/root/.hermes/skills")
-CODEX_LOGS_DB = Path("/root/.codex/logs_2.sqlite")
 _MODEL_CACHE: dict[str, Any] = {"expires_at": 0.0, "payload": None}
 AUTH_USER = os.environ.get("PANEL_AUTH_USER", "qjyqjy").strip()
 AUTH_PASSWORD = os.environ.get("PANEL_AUTH_PASSWORD", "")
@@ -45,8 +42,53 @@ PROTECTED_GET_PATHS = {
     "/api/switch_model",
     "/api/skills/install",
     "/api/skills/uninstall",
+    "/api/agent_config",
 }
 PROTECTED_PREFIXES = ("/api/service/",)
+PROTECTED_POST_PATHS = {"/api/agent_config/update"}
+
+
+# ─── agent discovery configuration ────────────────────────────────────────────
+
+AGENT_DISCOVERY: dict[str, dict[str, Any]] = {
+    "openclaw": {
+        "label": "OpenClaw",
+        "process_patterns": ["openclaw"],
+        "systemd_service": "openclaw-gateway.service",
+        "listen_ports": [18789, 18791],
+        "config_path": Path("/root/.openclaw/openclaw.json"),
+        "icon": "🦞",
+    },
+    "codex": {
+        "label": "Codex",
+        "process_patterns": ["codex", "codex-webui"],
+        "systemd_service": "codex-webui.service",
+        "listen_ports": [9009],
+        "config_path": Path("/root/.codex/config.toml"),
+        "icon": "🤖",
+    },
+}
+
+# Dynamic skill directory scanning (only existing directories are scanned)
+SKILL_SCAN_DIRS = [
+    (Path("/root/.openclaw/workspace/skills"), "openclaw"),
+    (Path("/root/.codex/skills"), "codex"),
+
+]
+
+# Agent-specific extra paths (sessions, logs, etc.)
+AGENT_EXTRA_PATHS: dict[str, dict[str, Any]] = {
+    "openclaw": {
+        "sessions_dir": Path("/root/.openclaw/agents/main/sessions"),
+        "logs_db": None,
+        "auth_path": None,
+    },
+    "codex": {
+        "sessions_dir": Path("/root/.codex/sessions"),
+        "logs_db": Path("/root/.codex/logs_2.sqlite"),
+        "auth_path": Path("/root/.codex/auth.json"),
+    },
+}
 
 
 # ─── auth helpers ─────────────────────────────────────────────────────────────
@@ -114,7 +156,9 @@ def _clear_cookie_header() -> str:
 def _requires_auth(path: str, method: str) -> bool:
     if method == "DELETE":
         return True
-    if method in {"GET", "POST"} and (path in PROTECTED_GET_PATHS or path.startswith(PROTECTED_PREFIXES)):
+    if method == "GET" and (path in PROTECTED_GET_PATHS or path.startswith(PROTECTED_PREFIXES)):
+        return True
+    if method == "POST" and (path in PROTECTED_GET_PATHS or path in PROTECTED_POST_PATHS or path.startswith(PROTECTED_PREFIXES)):
         return True
     return False
 
@@ -122,28 +166,27 @@ def _requires_auth(path: str, method: str) -> bool:
 # ─── helpers ──────────────────────────────────────────────────────────────────
 
 def _replace_terms(obj: Any) -> Any:
+    """Pass-through: no longer replaces openclaw with codex."""
     if isinstance(obj, dict):
-        out: dict[str, Any] = {}
-        has_codex = "codex" in obj
-        for key, value in obj.items():
-            if key == "openclaw" and has_codex:
-                continue
-            new_key = "codex" if key == "openclaw" else key
-            out[new_key] = _replace_terms(value)
-        return out
+        return {key: _replace_terms(value) for key, value in obj.items()}
     if isinstance(obj, list):
         return [_replace_terms(v) for v in obj]
-    if isinstance(obj, str):
-        return obj.replace("OpenClaw", "Codex").replace("openclaw", "codex")
     return obj
 
 
 def _normalize_agent_name(name: str) -> str:
+    """Normalize agent name aliases to canonical IDs from AGENT_DISCOVERY."""
     alias = (name or "").strip().lower()
-    if alias in {"codex", "openclaw", "oc"}:
-        return "codex"
-    if alias in {"hermes", "he"}:
-        return "hermes"
+    # Map aliases to discovered agent IDs
+    for agent_id, cfg in AGENT_DISCOVERY.items():
+        if alias == agent_id:
+            return agent_id
+        if alias == cfg.get("label", "").lower():
+            return agent_id
+    # Legacy aliases
+    if alias in {"oc"}:
+        return "openclaw"
+
     return alias
 
 
@@ -261,28 +304,23 @@ def _get_system_info() -> dict[str, Any]:
     except ImportError:
         return _fallback_system_info()
 
-    # CPU: psutil.cpu_percent(interval=None) returns 0 on first call, accurate after
     cpu_percent = psutil.cpu_percent(interval=None)
     load_avg = os.getloadavg() if hasattr(os, "getloadavg") else (0.0, 0.0, 0.0)
 
-    # Memory
     mem = psutil.virtual_memory()
     mem_used_gb = round(mem.used / (1024 ** 3), 1)
     mem_total_gb = round(mem.total / (1024 ** 3), 1)
     mem_percent = mem.percent
 
-    # Disk
     disk = psutil.disk_usage("/")
     disk_used_gb = round(disk.used / (1024 ** 3), 1)
     disk_total_gb = round(disk.total / (1024 ** 3), 1)
     disk_percent = disk.percent
 
-    # Network (bytes/sec since boot → compute delta is hard, so show totals)
     net = psutil.net_io_counters()
     net_in = net.bytes_recv
     net_out = net.bytes_sent
 
-    # Server uptime
     try:
         server_uptime_seconds = int(time.time() - psutil.boot_time())
     except Exception:
@@ -325,11 +363,85 @@ def _fallback_system_info() -> dict[str, Any]:
     }
 
 
-# ─── agent process detection ──────────────────────────────────────────────────
+# ─── agent discovery ──────────────────────────────────────────────────────────
 
-def _detect_agent_running(agent: str) -> dict[str, Any]:
-    """Detect if an agent process is running by scanning /proc or ps."""
-    import subprocess
+def _discover_agents() -> list[dict[str, Any]]:
+    """Scan all known agents in AGENT_DISCOVERY and return those that are actually present.
+
+    Discovery checks:
+    1. Process scan via ps aux
+    2. systemd service active state
+    3. Port listening check
+    4. Config path existence
+
+    Returns list of dicts with keys: id, label, icon, process_patterns,
+    systemd_service, listen_ports, config_path, discovered
+    """
+    discovered: list[dict[str, Any]] = []
+
+    # Read full process list once for efficiency
+    ps_output = ""
+    try:
+        proc = subprocess.run(["ps", "aux"], capture_output=True, text=True, timeout=5)
+        ps_output = proc.stdout.lower()
+    except Exception:
+        ps_output = ""
+
+    for agent_id, cfg in AGENT_DISCOVERY.items():
+        found = False
+
+        # Check 1: process patterns
+        for pattern in cfg.get("process_patterns", []):
+            if pattern.lower() in ps_output:
+                found = True
+                break
+
+        # Check 2: systemd service
+        svc = cfg.get("systemd_service")
+        if svc and not found:
+            try:
+                r = subprocess.run(
+                    ["systemctl", "is-active", svc],
+                    capture_output=True, text=True, timeout=3
+                )
+                if r.stdout.strip() == "active":
+                    found = True
+            except Exception:
+                pass
+
+        # Check 3: port listening
+        if not found:
+            for port in cfg.get("listen_ports", []):
+                try:
+                    import socket
+                    with socket.create_connection(("127.0.0.1", int(port)), timeout=0.3):
+                        found = True
+                        break
+                except Exception:
+                    continue
+
+        # Check 4: config path exists
+        config_path = cfg.get("config_path")
+        if config_path and Path(config_path).exists():
+            found = True
+
+        if found:
+            discovered.append({
+                "id": agent_id,
+                "label": cfg["label"],
+                "icon": cfg.get("icon", "🤖"),
+                "process_patterns": cfg.get("process_patterns", []),
+                "systemd_service": cfg.get("systemd_service"),
+                "listen_ports": cfg.get("listen_ports", []),
+                "config_path": str(config_path) if config_path else None,
+                "discovered": True,
+            })
+
+    return discovered
+
+
+def _detect_agent_running(agent_id: str) -> dict[str, Any]:
+    """Detect if an agent process is running by scanning ps output using AGENT_DISCOVERY patterns."""
     result = {
         "running": False,
         "pid": None,
@@ -340,20 +452,19 @@ def _detect_agent_running(agent: str) -> dict[str, Any]:
         "uptime_seconds": 0,
         "uptime": 0,
     }
-    try:
-        if agent == "codex":
-            patterns = ["codex", "openclaw"]
-        elif agent == "hermes":
-            patterns = ["hermes", "hermes-gateway"]
-        else:
-            patterns = [agent]
+    cfg = AGENT_DISCOVERY.get(agent_id)
+    if not cfg:
+        return result
 
+    patterns = cfg.get("process_patterns", [agent_id])
+
+    try:
         cmd = ["ps", "aux"]
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
         lines = proc.stdout.strip().split("\n")
         for line in lines[1:]:
             lower = line.lower()
-            if any(p in lower for p in patterns) and "grep" not in lower and "ps aux" not in lower:
+            if any(p.lower() in lower for p in patterns) and "grep" not in lower and "ps aux" not in lower:
                 parts = line.split()
                 if len(parts) >= 11:
                     try:
@@ -367,7 +478,6 @@ def _detect_agent_running(agent: str) -> dict[str, Any]:
                         result["memory_usage"] = mem_pct
                         result["mem_kb"] = mem_kb
                         result["mem_mb"] = round(mem_kb / 1024)
-                        # try to get process start time for uptime
                         try:
                             import psutil
                             p = psutil.Process(pid)
@@ -383,11 +493,33 @@ def _detect_agent_running(agent: str) -> dict[str, Any]:
     return result
 
 
-# ─── codex / hermes config ────────────────────────────────────────────────────
+# ─── agent config reading ──────────────────────────────────────────────────────
 
-def _read_codex_runtime() -> dict[str, Any]:
+def _read_agent_config(agent_id: str) -> dict[str, Any]:
+    """Generic agent config reader. Dispatches to format-specific parsers.
+
+    Returns dict with: model, provider, base_url, api_key, providers
+    """
+    cfg = AGENT_DISCOVERY.get(agent_id)
+    if not cfg or not cfg.get("config_path"):
+        return {"model": "", "provider": "", "base_url": "", "api_key": "", "providers": []}
+
+    config_path = Path(cfg["config_path"])
+    if not config_path.exists():
+        return {"model": "", "provider": "", "base_url": "", "api_key": "", "providers": []}
+
+    if agent_id == "codex":
+        return _read_codex_config(config_path)
+    if agent_id == "openclaw":
+        return _read_openclaw_config(config_path)
+
+    return {"model": "", "provider": "", "base_url": "", "api_key": "", "providers": []}
+
+
+def _read_codex_config(config_path: Path) -> dict[str, Any]:
+    """Read Codex config.toml."""
     result: dict[str, Any] = {"model": "", "provider": "", "base_url": "", "api_key": "", "providers": []}
-    raw = _safe_text(CODEX_CONFIG_PATH)
+    raw = _safe_text(config_path)
     if not raw:
         return result
     try:
@@ -402,19 +534,22 @@ def _read_codex_runtime() -> dict[str, Any]:
     base_url = str(provider_cfg.get("base_url", "") or "").strip()
 
     api_key = ""
-    try:
-        auth = json.loads(_safe_text(CODEX_AUTH_PATH) or "{}")
-        if isinstance(auth, dict):
-            api_key = str(auth.get("OPENAI_API_KEY") or auth.get("openai_api_key") or auth.get("api_key") or "").strip()
-    except Exception:
-        api_key = ""
+    extra = AGENT_EXTRA_PATHS.get("codex", {})
+    auth_path = extra.get("auth_path")
+    if auth_path and Path(auth_path).exists():
+        try:
+            auth = json.loads(_safe_text(Path(auth_path)) or "{}")
+            if isinstance(auth, dict):
+                api_key = str(auth.get("OPENAI_API_KEY") or auth.get("openai_api_key") or auth.get("api_key") or "").strip()
+        except Exception:
+            api_key = ""
 
     providers: list[dict[str, Any]] = []
     if isinstance(providers_cfg, dict):
-        for provider_name, cfg in providers_cfg.items():
-            if not isinstance(cfg, dict):
+        for provider_name, pcfg in providers_cfg.items():
+            if not isinstance(pcfg, dict):
                 continue
-            p_base = str(cfg.get("base_url", "") or "").strip()
+            p_base = str(pcfg.get("base_url", "") or "").strip()
             if not p_base:
                 continue
             providers.append({
@@ -428,58 +563,58 @@ def _read_codex_runtime() -> dict[str, Any]:
     return result
 
 
-def _read_hermes_runtime() -> dict[str, Any]:
+def _read_openclaw_config(config_path: Path) -> dict[str, Any]:
+    """Read OpenClaw config.json."""
     result: dict[str, Any] = {"model": "", "provider": "", "base_url": "", "api_key": "", "providers": []}
-    raw = _safe_text(HERMES_CONFIG_PATH)
+    raw = _safe_text(config_path)
     if not raw:
         return result
 
     config: dict[str, Any] = {}
     try:
-        import yaml  # type: ignore[import-not-found]
-        parsed = yaml.safe_load(raw)
+        parsed = json.loads(raw)
         if isinstance(parsed, dict):
             config = parsed
     except Exception:
-        config = {}
-
-    if not config:
-        model_match = re.search(r"(?m)^\s*default:\s*([^\n#]+)", raw)
-        base_url_match = re.search(r"(?m)^\s*base_url:\s*([^\n#]+)", raw)
-        api_key_match = re.search(r"(?m)^\s*api_key:\s*([^\n#]+)", raw)
-        if model_match:
-            result["model"] = model_match.group(1).strip().strip("'\"")
-        if base_url_match:
-            result["base_url"] = base_url_match.group(1).strip().strip("'\"")
-        if api_key_match:
-            result["api_key"] = api_key_match.group(1).strip().strip("'\"")
         return result
 
-    model_cfg = config.get("model", {}) if isinstance(config.get("model"), dict) else {}
-    providers_cfg = config.get("custom_providers", [])
-    providers: list[dict[str, Any]] = []
-    if isinstance(providers_cfg, list):
-        for cfg in providers_cfg:
-            if not isinstance(cfg, dict):
+    # Extract model from agents.defaults.model.primary
+    agents_cfg = config.get("agents", {})
+    defaults = agents_cfg.get("defaults", {}) if isinstance(agents_cfg, dict) else {}
+    model_cfg = defaults.get("model", {}) if isinstance(defaults, dict) else {}
+    primary = model_cfg.get("primary", "") if isinstance(model_cfg, dict) else ""
+    model = str(primary).strip()
+
+    # Extract provider info from models.providers
+    models_cfg = config.get("models", {})
+    providers_cfg = models_cfg.get("providers", {}) if isinstance(models_cfg, dict) else {}
+    providers_list: list[dict[str, Any]] = []
+    if isinstance(providers_cfg, dict):
+        for pname, pcfg in providers_cfg.items():
+            if not isinstance(pcfg, dict):
                 continue
-            p_base = str(cfg.get("base_url", "") or "").strip()
-            if not p_base:
-                continue
-            providers.append({
-                "agent": "hermes",
-                "name": str(cfg.get("name", "") or "Hermes"),
+            p_base = str(pcfg.get("baseUrl", "") or pcfg.get("base_url", "") or "").strip()
+            p_key = str(pcfg.get("apiKey", "") or pcfg.get("api_key", "") or "").strip()
+            p_models = pcfg.get("models", [])
+            if isinstance(p_models, list):
+                p_model_ids = [str(m.get("id", "")) for m in p_models if isinstance(m, dict)]
+            else:
+                p_model_ids = []
+            providers_list.append({
+                "name": pname,
                 "base_url": p_base,
-                "api_key": str(cfg.get("api_key", "") or "").strip(),
-                "model": str(cfg.get("model", "") or "").strip(),
+                "api_key": p_key,
+                "models": p_model_ids,
             })
 
-    result.update({
-        "model": str(model_cfg.get("default", "") or "").strip(),
-        "provider": str(model_cfg.get("provider", "") or "").strip(),
-        "base_url": str(model_cfg.get("base_url", "") or "").strip(),
-        "api_key": str(model_cfg.get("api_key", "") or "").strip(),
-        "providers": providers,
-    })
+    # Use first provider as the "current" one
+    if providers_list:
+        result["provider"] = providers_list[0]["name"]
+        result["base_url"] = providers_list[0]["base_url"]
+        result["api_key"] = providers_list[0]["api_key"]
+
+    result["model"] = model
+    result["providers"] = providers_list
     return result
 
 
@@ -503,16 +638,12 @@ def _provider_models(base_url: str, api_key: str) -> list[dict[str, Any]]:
 
 
 def _build_local_models_payload() -> dict[str, Any]:
+    """Build models payload by iterating over discovered agents."""
     now = time.time()
-    codex = _read_codex_runtime()
-    hermes = _read_hermes_runtime()
+    agents = _discover_agents()
 
-    agent_models = {
-        "codex": codex.get("model") or "",
-        "hermes": hermes.get("model") or "",
-    }
-    agent_model_lists: dict[str, list[str]] = {"codex": [], "hermes": []}
-
+    agent_models: dict[str, str] = {}
+    agent_model_lists: dict[str, list[str]] = {}
     available_models: list[dict[str, Any]] = []
     seen: set[str] = set()
 
@@ -520,9 +651,8 @@ def _build_local_models_payload() -> dict[str, Any]:
         clean_id = (model_id or "").strip()
         if not clean_id:
             return
-        clean_agent = _normalize_agent_name(agent)
-        if clean_agent in agent_model_lists and clean_id not in agent_model_lists[clean_agent]:
-            agent_model_lists[clean_agent].append(clean_id)
+        if clean_id not in agent_model_lists.get(agent, []):
+            agent_model_lists.setdefault(agent, []).append(clean_id)
         if clean_id in seen:
             return
         seen.add(clean_id)
@@ -534,30 +664,26 @@ def _build_local_models_payload() -> dict[str, Any]:
             "reasoning": bool(reasoning),
         })
 
-    # Only add models that are actually configured in agent configs.
-    # Do NOT pull full model list from providers — that surfaces unrelated models
-    # (e.g. TTS, omni) that the agent never uses.
+    for agent_info in agents:
+        agent_id = agent_info["id"]
+        agent_config = _read_agent_config(agent_id)
 
-    # Codex: add its configured model
-    codex_model = str(agent_models["codex"]).strip()
-    if codex_model:
-        codex_provider_name = str(codex.get("provider") or _short_provider_name(str(codex.get("base_url") or "")) or "Codex")
-        add_model("codex", codex_model, codex_provider_name)
+        model = str(agent_config.get("model") or "").strip()
+        provider = str(agent_config.get("provider") or _short_provider_name(str(agent_config.get("base_url") or "")) or agent_info["label"])
 
-    # Hermes: add its configured model from primary provider
-    hermes_model = str(agent_models["hermes"]).strip()
-    if hermes_model:
-        hermes_provider_name = str(hermes.get("provider") or _short_provider_name(str(hermes.get("base_url") or "")) or "Hermes")
-        add_model("hermes", hermes_model, hermes_provider_name)
+        agent_models[agent_id] = model
 
-    # Hermes custom_providers: add the model field from each extra provider
-    for item in hermes.get("providers", []):
-        if not isinstance(item, dict):
-            continue
-        p_name = str(item.get("name") or "Hermes")
-        p_model = str(item.get("model") or "").strip()
-        if p_model:
-            add_model("hermes", p_model, p_name)
+        if model:
+            add_model(agent_id, model, provider)
+
+        # Custom providers
+        for item in agent_config.get("providers", []):
+            if not isinstance(item, dict):
+                continue
+            p_name = str(item.get("name") or agent_info["label"])
+            p_model = str(item.get("model") or "").strip()
+            if p_model:
+                add_model(agent_id, p_model, p_name)
 
     payload: dict[str, Any] = {
         "available_models": available_models,
@@ -585,7 +711,7 @@ def _local_models_payload() -> dict[str, Any]:
 # ─── call stats from SQLite ───────────────────────────────────────────────────
 
 def _read_call_stats(period: str = "all") -> dict[str, Any]:
-    """Read real call statistics from codex logs_2.sqlite and hermes state.db."""
+    """Read call statistics from agent trajectory files (OpenClaw) and session logs (Codex)."""
     def period_cutoff(value: str) -> float | None:
         normalized = (value or "all").strip().lower()
         seconds_by_period = {
@@ -599,6 +725,12 @@ def _read_call_stats(period: str = "all") -> dict[str, Any]:
         return time.time() - seconds if seconds else None
 
     cutoff = period_cutoff(period)
+    agents = _discover_agents()
+
+    by_source: dict[str, dict[str, int]] = {}
+    for a in agents:
+        by_source[a["id"]] = {"calls": 0, "input": 0, "output": 0, "cache": 0, "total": 0, "response_time": 0}
+
     result = {
         "period": period,
         "total_calls": 0,
@@ -608,218 +740,197 @@ def _read_call_stats(period: str = "all") -> dict[str, Any]:
         "total_tokens": 0,
         "avg_response_time": 0,
         "total_response_time": 0,
-        "by_source": {
-            "codex": {"calls": 0, "input": 0, "output": 0, "cache": 0, "total": 0, "response_time": 0},
-            "hermes": {"calls": 0, "input": 0, "output": 0, "cache": 0, "total": 0, "response_time": 0},
-        },
+        "by_source": by_source,
         "by_model": {},
         "scan_time": time.time(),
         "all_time_calls": 0,
     }
 
-    # ── Read Codex logs_2.sqlite ──────────────────────────────────────────────
-    try:
-        import sqlite3 as _sq
-        if CODEX_LOGS_DB.exists():
-            conn = _sq.connect(f"file:{CODEX_LOGS_DB}?mode=ro", uri=True, timeout=5)
-            conn.row_factory = _sq.Row
-            tables = conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
-            table_names = {r[0].lower() for r in tables}
+    for agent_info in agents:
+        agent_id = agent_info["id"]
+        extra = AGENT_EXTRA_PATHS.get(agent_id, {})
+        sessions_dir = extra.get("sessions_dir")
 
-            # Count codex calls from logs table
-            if "logs" in table_names:
-                all_row = conn.execute("SELECT COUNT(*) as cnt FROM logs").fetchone()
-                if all_row and all_row["cnt"]:
-                    result["all_time_calls"] += all_row["cnt"]
-                if cutoff is None:
-                    row = all_row
-                else:
-                    row = conn.execute("SELECT COUNT(*) as cnt FROM logs WHERE ts >= ?", (int(cutoff),)).fetchone()
-                if row and row["cnt"]:
-                    codex_calls = row["cnt"]
-                    result["by_source"]["codex"]["calls"] = codex_calls
-                    result["total_calls"] += codex_calls
+        if not sessions_dir or not Path(sessions_dir).exists():
+            continue
 
-            conn.close()
-    except Exception:
-        pass
-
-    # ── Read Hermes state.db ──────────────────────────────────────────────────
-    HERMES_STATE_DB = Path("/root/.hermes/state.db")
-    try:
-        import sqlite3 as _sq
-        if HERMES_STATE_DB.exists():
-            conn = _sq.connect(f"file:{HERMES_STATE_DB}?mode=ro", uri=True, timeout=5)
-            conn.row_factory = _sq.Row
-
-            # Total hermes sessions as call count
-            all_row = conn.execute("SELECT COUNT(*) as cnt FROM sessions").fetchone()
-            if all_row and all_row["cnt"]:
-                result["all_time_calls"] += all_row["cnt"]
-            if cutoff is None:
-                row = all_row
-            else:
-                row = conn.execute("SELECT COUNT(*) as cnt FROM sessions WHERE started_at >= ?", (cutoff,)).fetchone()
-            hermes_calls = row["cnt"] if row else 0
-
-            # Token stats per model
-            stats_sql = (
-                "SELECT model, "
-                "COUNT(*) as calls, "
-                "COALESCE(SUM(input_tokens),0) as inp, "
-                "COALESCE(SUM(output_tokens),0) as out, "
-                "COALESCE(SUM(cache_read_tokens),0) as cache, "
-                "COALESCE(SUM(input_tokens),0) + COALESCE(SUM(output_tokens),0) + COALESCE(SUM(cache_read_tokens),0) as total "
-                "FROM sessions"
-            )
-            if cutoff is None:
-                rows = conn.execute(stats_sql + " GROUP BY model").fetchall()
-            else:
-                rows = conn.execute(stats_sql + " WHERE started_at >= ? GROUP BY model", (cutoff,)).fetchall()
-
-            hermes_total_input = 0
-            hermes_total_output = 0
-            hermes_total_cache = 0
-            hermes_total_tokens = 0
-
-            for r in rows:
-                model = r["model"] or "unknown"
-                inp = r["inp"] or 0
-                out = r["out"] or 0
-                cache = r["cache"] or 0
-                total = r["total"] or 0
-
-                hermes_total_input += inp
-                hermes_total_output += out
-                hermes_total_cache += cache
-                hermes_total_tokens += total
-
-                # Merge into by_model
-                if model not in result["by_model"]:
-                    result["by_model"][model] = {"calls": 0, "input": 0, "output": 0, "cache": 0, "total": 0}
-                result["by_model"][model]["calls"] += r["calls"] or 0
-                result["by_model"][model]["input"] += inp
-                result["by_model"][model]["output"] += out
-                result["by_model"][model]["cache"] += cache
-                result["by_model"][model]["total"] += total
-
-            result["by_source"]["hermes"]["calls"] = hermes_calls
-            result["by_source"]["hermes"]["input"] = hermes_total_input
-            result["by_source"]["hermes"]["output"] = hermes_total_output
-            result["by_source"]["hermes"]["cache"] = hermes_total_cache
-            result["by_source"]["hermes"]["total"] = hermes_total_tokens
-
-            result["total_calls"] += hermes_calls
-            result["total_input"] += hermes_total_input
-            result["total_output"] += hermes_total_output
-            result["total_cache"] += hermes_total_cache
-            result["total_tokens"] += hermes_total_tokens
-
-            conn.close()
-    except Exception:
-        pass
-
-    return result
-# ─── sessions from filesystem ─────────────────────────────────────────────────
-
-def _scan_sessions() -> list[dict[str, Any]]:
-    """Scan /root/.codex/sessions for rollout files and build session list."""
-    sessions: list[dict[str, Any]]
-    sessions = []
-    if not CODEX_SESSIONS_DIR.exists():
-        return sessions
-
-    import glob
-    pattern = str(CODEX_SESSIONS_DIR / "**" / "*.jsonl")
-    files = sorted(glob.glob(pattern, recursive=True), reverse=True)
-
-    for fpath in files[:100]:  # cap at 100 most recent
-        try:
-            p = Path(fpath)
-            stat = p.stat()
-            size = stat.st_size
-            mtime = stat.st_mtime
-
-            # Determine date from path
-            rel = p.relative_to(CODEX_SESSIONS_DIR)
-            parts = rel.parts
-            date_str = "/".join(parts[:3]) if len(parts) >= 3 else ""
-
-            # Count lines (messages)
-            msg_count = 0
-            first_line = ""
-            last_line = ""
+        # Read token usage from trajectory files (*.trajectory.jsonl)
+        for traj_file in Path(sessions_dir).glob("*.trajectory.jsonl"):
             try:
-                with open(fpath, "r", encoding="utf-8", errors="replace") as f:
-                    for i, line in enumerate(f):
+                with open(traj_file, "r") as f:
+                    for line in f:
                         line = line.strip()
                         if not line:
                             continue
-                        msg_count += 1
-                        if i == 0:
-                            first_line = line[:200]
-                        last_line = line[:200]
+                        try:
+                            entry = json.loads(line)
+                        except Exception:
+                            continue
+                        if entry.get("type") != "trace.artifacts":
+                            continue
+
+                        # Time filtering
+                        if cutoff is not None:
+                            ts_str = entry.get("ts", "")
+                            if ts_str:
+                                try:
+                                    from datetime import datetime, timezone
+                                    ts_dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                                    ts_unix = ts_dt.timestamp()
+                                    if ts_unix < cutoff:
+                                        continue
+                                except Exception:
+                                    pass
+
+                        usage = entry.get("data", {}).get("usage", {})
+                        if not usage:
+                            continue
+
+                        inp = usage.get("input", 0)
+                        out = usage.get("output", 0)
+                        cache = usage.get("cacheRead", 0)
+                        total = usage.get("total", 0)
+
+                        # Get model info
+                        model_id = entry.get("modelId", "unknown")
+
+                        result["by_source"][agent_id]["calls"] += 1
+                        result["by_source"][agent_id]["input"] += inp
+                        result["by_source"][agent_id]["output"] += out
+                        result["by_source"][agent_id]["cache"] += cache
+                        result["by_source"][agent_id]["total"] += total
+
+                        # By model
+                        if model_id not in result["by_model"]:
+                            result["by_model"][model_id] = {"calls": 0, "input": 0, "output": 0, "cache": 0, "total": 0}
+                        result["by_model"][model_id]["calls"] += 1
+                        result["by_model"][model_id]["input"] += inp
+                        result["by_model"][model_id]["output"] += out
+                        result["by_model"][model_id]["cache"] += cache
+                        result["by_model"][model_id]["total"] += total
+
+                        result["total_calls"] += 1
+                        result["total_input"] += inp
+                        result["total_output"] += out
+                        result["total_cache"] += cache
+                        result["total_tokens"] += total
+                        result["all_time_calls"] += 1
             except Exception:
                 pass
 
-            # Parse first line for session info
-            session_id = p.stem
-            channel = "unknown"
-            agent = "codex"
-            status_str = "活跃"
-            model_name = ""
+        # Also try SQLite logs_db if available (Codex legacy)
+        logs_db = extra.get("logs_db")
+        if logs_db and Path(logs_db).exists():
             try:
-                if first_line:
-                    data = json.loads(first_line)
-                    channel = data.get("channel", data.get("source", "unknown"))
-                    agent = data.get("agent", "codex")
-                    model_name = data.get("model", "")
+                conn = sqlite3.connect(f"file:{logs_db}?mode=ro", uri=True, timeout=5)
+                conn.row_factory = sqlite3.Row
+                try:
+                    all_row = conn.execute("SELECT COUNT(*) as cnt FROM logs").fetchone()
+                    if all_row and all_row["cnt"]:
+                        result["all_time_calls"] += all_row["cnt"]
+                except Exception:
+                    pass
+                conn.close()
             except Exception:
                 pass
 
-            # Determine status from file age
-            age_hours = (time.time() - mtime) / 3600
-            if age_hours > 24:
-                status_str = "空闲"
+    return result
 
-            # Session type detection
-            session_type = "normal"
-            fpath_lower = fpath.lower()
-            if "dream" in fpath_lower:
-                session_type = "dreaming"
-            elif "sub" in fpath_lower:
-                session_type = "subagent"
+# ─── sessions from filesystem ─────────────────────────────────────────────────
 
-            sessions.append({
-                "key": session_id,
-                "id": session_id,
-                "session_id": session_id,
-                "channel": channel,
-                "agent": agent,
-                "agent_id": agent,
-                "model": model_name,
-                "model_name": model_name,
-                "status": status_str,
-                "session_type": session_type,
-                "chat_type": "direct",
-                "user_id": "",
-                "msg_count": msg_count,
-                "last_usage_tokens": 0,
-                "total_tokens": 0,
-                "context_tokens": 0,
-                "compaction_count": 0,
-                "aborted": False,
-                "file_size": size,
-                "file_size_human": _format_bytes(size),
-                "file_size_fmt": _format_bytes(size),
-                "last_active": time.strftime("%Y-%m-%d %H:%M", time.localtime(mtime)),
-                "created": date_str,
-                "modified": time.strftime("%Y-%m-%d %H:%M", time.localtime(mtime)),
-                "path": str(p),
-                "age_hours": round(age_hours, 1),
-            })
-        except Exception:
+def _scan_sessions() -> list[dict[str, Any]]:
+    """Scan session directories from discovered agents."""
+    sessions: list[dict[str, Any]] = []
+
+    for agent_id, extra in AGENT_EXTRA_PATHS.items():
+        sessions_dir = extra.get("sessions_dir")
+        if not sessions_dir or not Path(sessions_dir).exists():
             continue
+
+        import glob
+        pattern = str(Path(sessions_dir) / "**" / "*.jsonl")
+        files = sorted(glob.glob(pattern, recursive=True), reverse=True)
+
+        for fpath in files[:100]:
+            try:
+                p = Path(fpath)
+                stat = p.stat()
+                size = stat.st_size
+                mtime = stat.st_mtime
+
+                rel = p.relative_to(Path(sessions_dir))
+                parts = rel.parts
+                date_str = "/".join(parts[:3]) if len(parts) >= 3 else ""
+
+                msg_count = 0
+                first_line = ""
+                last_line = ""
+                try:
+                    with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                        for i, line in enumerate(f):
+                            line = line.strip()
+                            if not line:
+                                continue
+                            msg_count += 1
+                            if i == 0:
+                                first_line = line[:200]
+                            last_line = line[:200]
+                except Exception:
+                    pass
+
+                session_id = p.stem
+                channel = "unknown"
+                status_str = "活跃"
+                model_name = ""
+                try:
+                    if first_line:
+                        data = json.loads(first_line)
+                        channel = data.get("channel", data.get("source", "unknown"))
+                        model_name = data.get("model", "")
+                except Exception:
+                    pass
+
+                age_hours = (time.time() - mtime) / 3600
+                if age_hours > 24:
+                    status_str = "空闲"
+
+                session_type = "normal"
+                fpath_lower = fpath.lower()
+                if "dream" in fpath_lower:
+                    session_type = "dreaming"
+                elif "sub" in fpath_lower:
+                    session_type = "subagent"
+
+                sessions.append({
+                    "key": session_id,
+                    "id": session_id,
+                    "session_id": session_id,
+                    "channel": channel,
+                    "agent": agent_id,
+                    "agent_id": agent_id,
+                    "model": model_name,
+                    "model_name": model_name,
+                    "status": status_str,
+                    "session_type": session_type,
+                    "chat_type": "direct",
+                    "user_id": "",
+                    "msg_count": msg_count,
+                    "last_usage_tokens": 0,
+                    "total_tokens": 0,
+                    "context_tokens": 0,
+                    "compaction_count": 0,
+                    "aborted": False,
+                    "file_size": size,
+                    "file_size_human": _format_bytes(size),
+                    "file_size_fmt": _format_bytes(size),
+                    "last_active": time.strftime("%Y-%m-%d %H:%M", time.localtime(mtime)),
+                    "created": date_str,
+                    "modified": time.strftime("%Y-%m-%d %H:%M", time.localtime(mtime)),
+                    "path": str(p),
+                    "age_hours": round(age_hours, 1),
+                })
+            except Exception:
+                continue
 
     return sessions
 
@@ -830,27 +941,33 @@ def _delete_session_file(session_key: str) -> dict[str, Any]:
         return {"status": "error", "success": False, "error": "缺少会话标识"}
     if "/" in clean_key or "\\" in clean_key or clean_key in {".", ".."}:
         return {"status": "error", "success": False, "error": "非法会话标识"}
-    if not CODEX_SESSIONS_DIR.exists():
-        return {"status": "error", "success": False, "error": "会话目录不存在"}
 
-    matches = [p for p in CODEX_SESSIONS_DIR.rglob("*.jsonl") if p.stem == clean_key]
-    if not matches:
-        return {"status": "error", "success": False, "error": "未找到会话文件"}
-    if len(matches) > 1:
-        return {"status": "error", "success": False, "error": "匹配到多个会话文件，拒绝删除"}
+    # Search across all agent session dirs
+    for agent_id, extra in AGENT_EXTRA_PATHS.items():
+        sessions_dir = extra.get("sessions_dir")
+        if not sessions_dir or not Path(sessions_dir).exists():
+            continue
 
-    target = matches[0].resolve()
-    try:
-        target.relative_to(CODEX_SESSIONS_DIR.resolve())
-    except ValueError:
-        return {"status": "error", "success": False, "error": "会话路径越界"}
+        matches = [p for p in Path(sessions_dir).rglob("*.jsonl") if p.stem == clean_key]
+        if not matches:
+            continue
+        if len(matches) > 1:
+            return {"status": "error", "success": False, "error": "匹配到多个会话文件，拒绝删除"}
 
-    try:
-        target.unlink()
-    except Exception as exc:
-        return {"status": "error", "success": False, "error": f"删除失败：{exc}"}
+        target = matches[0].resolve()
+        try:
+            target.relative_to(Path(sessions_dir).resolve())
+        except ValueError:
+            return {"status": "error", "success": False, "error": "会话路径越界"}
 
-    return {"status": "success", "success": True, "message": "会话文件已删除", "deleted": str(target)}
+        try:
+            target.unlink()
+        except Exception as exc:
+            return {"status": "error", "success": False, "error": f"删除失败：{exc}"}
+
+        return {"status": "success", "success": True, "message": "会话文件已删除", "deleted": str(target)}
+
+    return {"status": "error", "success": False, "error": "未找到会话文件"}
 
 
 def _format_bytes(n: int) -> str:
@@ -864,15 +981,10 @@ def _format_bytes(n: int) -> str:
 # ─── skills from filesystem ───────────────────────────────────────────────────
 
 def _scan_skills() -> list[dict[str, Any]]:
-    """Scan hermes and codex skill directories for SKILL.md files."""
+    """Scan skill directories from SKILL_SCAN_DIRS for existing directories."""
     skills: list[dict[str, Any]] = []
 
-    skill_dirs = [
-        (HERMES_SKILLS_DIR, "hermes", False),
-        (CODEX_SKILLS_DIR, "codex", False),
-    ]
-
-    for sdir, source, bundled_override in skill_dirs:
+    for sdir, source in SKILL_SCAN_DIRS:
         if not sdir.exists():
             continue
         for item in sorted(sdir.iterdir()):
@@ -884,7 +996,7 @@ def _scan_skills() -> list[dict[str, Any]]:
             skill_md = item / "SKILL.md"
             name = item.name
             description = ""
-            bundled = source == "hermes"  # hermes skills are bundled
+            bundled = False
             eligible = True
             disabled = False
             icon = "fa-puzzle-piece"
@@ -893,28 +1005,22 @@ def _scan_skills() -> list[dict[str, Any]]:
             if skill_md.exists():
                 try:
                     content = skill_md.read_text(encoding="utf-8", errors="replace")
-                    # Parse frontmatter
                     fm_match = re.match(r"^---\s*\n(.*?)\n---", content, re.DOTALL)
                     if fm_match:
                         fm_text = fm_match.group(1)
-                        # Extract description
                         desc_m = re.search(r"(?m)^\s*description:\s*['\"]?(.+?)['\"]?\s*$", fm_text)
                         if desc_m:
                             description = desc_m.group(1).strip().strip("'\"")
-                        # Extract name
                         name_m = re.search(r"(?m)^\s*name:\s*['\"]?(.+?)['\"]?\s*$", fm_text)
                         if name_m:
                             name = name_m.group(1).strip().strip("'\"")
-                        # Extract icon
                         icon_m = re.search(r"(?m)^\s*icon:\s*['\"]?(.+?)['\"]?\s*$", fm_text)
                         if icon_m:
                             icon = icon_m.group(1).strip().strip("'\"")
-                        # Extract category
                         cat_m = re.search(r"(?m)^\s*(category|tags):\s*['\"]?(.+?)['\"]?\s*$", fm_text)
                         if cat_m:
                             category = cat_m.group(2).strip().strip("'\"")
 
-                    # First non-empty non-header line as description fallback
                     if not description:
                         for line in content.split("\n"):
                             line = line.strip()
@@ -924,7 +1030,6 @@ def _scan_skills() -> list[dict[str, Any]]:
                 except Exception:
                     pass
 
-            # Check eligibility: skill has content
             eligible = skill_md.exists() and skill_md.stat().st_size > 50
 
             skills.append({
@@ -946,22 +1051,25 @@ def _scan_skills() -> list[dict[str, Any]]:
 # ─── system services ──────────────────────────────────────────────────────────
 
 def _scan_services() -> list[dict[str, Any]]:
-    """Return list of running systemd services relevant to the panel."""
+    """Return list of running systemd services relevant to the panel.
+
+    Automatically includes services from discovered agents + panel itself.
+    """
     services: list[dict[str, Any]] = []
-    known_services = {
-        "codex-standalone-webui.service": {"name": "Codex WebUI", "icon": "🤖", "ports": [9009]},
-        "hermes-gateway.service": {"name": "Hermes 网关", "icon": "🧠", "ports": [9119]},
-        "hermes-web-ui.service": {"name": "Hermes WebUI", "icon": "🌐", "ports": [8648]},
-        "nginx.service": {"name": "Nginx", "icon": "⚡", "ports": [80]},
-        "ssh.service": {"name": "SSH 服务", "icon": "🔑", "ports": [22]},
-        "football-web.service": {"name": "足球预测面板", "icon": "⚽", "ports": [8080]},
-        "plotpilot.service": {"name": "PlotPilot", "icon": "📊", "ports": [8005]},
-        "metapi.service": {"name": "Metapi 服务", "icon": "🔮", "ports": [80, 8085]},
-        "uniagentd.service": {"name": "UniAgent 守护进程", "icon": "🛡️", "ports": [29338, 29339]},
-        "ces-uniagent.service": {"name": "CES UniAgent", "icon": "🎯", "ports": []},
-        "cron.service": {"name": "Cron 定时任务", "icon": "⏰", "ports": []},
-        "docker.service": {"name": "Docker", "icon": "🐳", "ports": []},
-    }
+
+    # Build known_services from discovered agents
+    known_services: dict[str, dict[str, Any]] = {}
+
+    # Add discovered agents' systemd services
+    agents = _discover_agents()
+    for agent_info in agents:
+        svc = agent_info.get("systemd_service")
+        if svc:
+            known_services[svc] = {
+                "name": f"{agent_info['label']} 服务",
+                "icon": agent_info.get("icon", "🤖"),
+                "ports": agent_info.get("listen_ports", []),
+            }
 
     # Always add panel itself
     services.append({
@@ -1008,7 +1116,6 @@ def _scan_services() -> list[dict[str, Any]]:
 
         return sorted(ports)
 
-    import subprocess
     try:
         result = subprocess.run(
             ["systemctl", "list-units", "--type=service", "--state=running", "--no-pager", "--plain"],
@@ -1021,7 +1128,6 @@ def _scan_services() -> list[dict[str, Any]]:
             unit = parts[0]
             if unit in known_services:
                 info = known_services[unit]
-                # Try to get PID
                 pid = None
                 try:
                     pid_result = subprocess.run(
@@ -1068,20 +1174,50 @@ def _scan_services() -> list[dict[str, Any]]:
 # ─── changelog ────────────────────────────────────────────────────────────────
 
 def _load_changelog_entries() -> list[dict[str, Any]]:
-    html = _safe_text(BASE_DIR / "changelog.html")
-    if not html:
-        return []
-    try:
-        idx = html.index('CHANGELOG_DATA')
-        start = html.index('{', idx)
-        decoder = json.JSONDecoder()
-        payload, _ = decoder.raw_decode(html[start:])
-    except (ValueError, json.JSONDecodeError):
-        return []
-    entries = payload.get("entries", [])
-    if not isinstance(entries, list):
-        return []
-    return entries
+    """Return changelog entries embedded in server."""
+    return [
+        {
+            "version": "v1.4.0",
+            "date": "2026-05-04",
+            "changes": [
+                {"type": "新功能", "desc": "新增文件管理页面：浏览、编辑、上传、下载服务器文件"},
+                {"type": "新功能", "desc": "智能系统项目浏览改为文件浏览器弹窗"},
+                {"type": "新功能", "desc": "模型管理新增供应商配置：修改 URL、API Key、模型"},
+                {"type": "修复", "desc": "仪表盘和面板信息改为本机实时数据，不再依赖上游"},
+                {"type": "修复", "desc": "会话管理数据联动，自动扫描 OpenClaw 和 Codex 会话"},
+                {"type": "修复", "desc": "Token 统计按来源分布改为动态渲染"},
+                {"type": "修复", "desc": "完全清除 Hermes 硬编码，所有智能体动态检测"},
+                {"type": "修复", "desc": "测试连接接口无需登录即可使用"},
+                {"type": "修复", "desc": "更新日志改为从 API 动态加载"},
+            ]
+        },
+        {
+            "version": "v1.3.0",
+            "date": "2026-04-30",
+            "changes": [
+                {"type": "修复", "desc": "模型列表不再从 provider 拉全量，只展示 agent 实际配置的模型"},
+                {"type": "修复", "desc": "系统信息（CPU/内存/磁盘/网络）使用 psutil 读取真实数据"},
+                {"type": "修复", "desc": "会话列表扫描真实 rollout 文件"},
+                {"type": "修复", "desc": "服务列表从 systemctl running 检测真实运行中的服务"},
+            ]
+        },
+        {
+            "version": "v1.2.0",
+            "date": "2026-04-30",
+            "changes": [
+                {"type": "新功能", "desc": "新增 /api/stats 汇总端点"},
+                {"type": "修复", "desc": "前端 refreshDashboard 并行请求提速"},
+            ]
+        },
+        {
+            "version": "v1.1.0",
+            "date": "2026-04-29",
+            "changes": [
+                {"type": "新功能", "desc": "小猪智能体面板初版上线（端口1234）"},
+                {"type": "新功能", "desc": "仪表盘、模型管理、会话管理、技能管理、智能系统"},
+            ]
+        },
+    ]
 
 
 def _fallback_changelog() -> dict[str, Any]:
@@ -1107,12 +1243,22 @@ def _current_panel_version() -> str:
 def _scan_projects() -> list[dict[str, Any]]:
     """Scan known project directories and attach service port hints."""
     projects = []
-    interesting = {
-        "/root/.codex": {"name": "Codex 配置", "icon": "⚙️", "tags": ["配置", "Codex"], "ports": [9009]},
-        "/root/.hermes": {"name": "Hermes 配置", "icon": "🧩", "tags": ["配置", "Hermes"], "ports": [8648]},
-        "/root/football-prediction": {"name": "足球预测系统", "icon": "⚽", "tags": ["ML", "足球", "预测"], "ports": [8080]},
-        "/opt/PlotPilot": {"name": "PlotPilot 小说创作", "icon": "📚", "tags": ["AI", "小说", "创作"], "ports": [8005]},
-    }
+
+    # Build project list from discovered agents
+    interesting: dict[str, dict[str, Any]] = {}
+    agents = _discover_agents()
+    for agent_info in agents:
+        agent_id = agent_info["id"]
+        cfg = AGENT_DISCOVERY.get(agent_id, {})
+        config_path = cfg.get("config_path")
+        if config_path:
+            config_dir = str(Path(config_path).parent)
+            interesting[config_dir] = {
+                "name": f"{agent_info['label']} 配置",
+                "icon": cfg.get("icon", "⚙️"),
+                "tags": ["配置", agent_info["label"]],
+                "ports": cfg.get("listen_ports", []),
+            }
 
     def _first_open_port(candidates: list[int]) -> int | None:
         import socket
@@ -1153,68 +1299,52 @@ def _scan_projects() -> list[dict[str, Any]]:
 def _fallback_status() -> dict[str, Any]:
     now = time.time()
     sys_info = _get_system_info()
+    agents = _discover_agents()
     local_models = _local_models_payload()
-    codex_model = str((local_models.get("agent_models") or {}).get("codex") or "unknown")
-    hermes_model = str((local_models.get("agent_models") or {}).get("hermes") or "unknown")
-
-    # Detect real agent processes
-    codex_proc = _detect_agent_running("codex")
-    hermes_proc = _detect_agent_running("hermes")
-
-    # Read call stats for real counts
     call_stats = _read_call_stats()
 
+    agents_status: dict[str, Any] = {}
+    for agent_info in agents:
+        agent_id = agent_info["id"]
+        proc = _detect_agent_running(agent_id)
+        agent_model = str((local_models.get("agent_models") or {}).get(agent_id) or "unknown")
+        agent_call_stats = call_stats.get("by_source", {}).get(agent_id, {})
+
+        agents_status[agent_id] = {
+            "name": agent_info["label"],
+            "status": "online" if proc["running"] else "stopped",
+            "cpu_usage": round(proc["cpu_usage"], 1),
+            "memory_usage": round(proc["memory_usage"], 1),
+            "disk_usage": 0,
+            "network_in": 0,
+            "network_out": 0,
+            "uptime": proc["uptime_seconds"],
+            "tasks": [],
+            "last_update": now,
+            "api_calls": agent_call_stats.get("calls", 0),
+            "total_response_time": agent_call_stats.get("response_time", 0),
+            "successful_calls": agent_call_stats.get("calls", 0),
+            "uptime_seconds": proc["uptime_seconds"],
+            "start_time": time.strftime("%a %b %d %H:%M:%S %Y", time.localtime(now - proc["uptime_seconds"])),
+            "mem_kb": proc["mem_kb"],
+            "mem_mb": proc["mem_mb"],
+            "version": "unknown",
+            "disk_size": "--",
+            "model": agent_model,
+            "running": proc["running"],
+            "pid": proc["pid"],
+        }
+
+    # Use first discovered agent's model as primary
+    primary_model = "unknown"
+    for agent_info in agents:
+        m = str((local_models.get("agent_models") or {}).get(agent_info["id"]) or "").strip()
+        if m:
+            primary_model = m
+            break
+
     return {
-        "agents": {
-            "codex": {
-                "name": "Codex",
-                "status": "online" if codex_proc["running"] else "stopped",
-                "cpu_usage": round(codex_proc["cpu_usage"], 1),
-                "memory_usage": round(codex_proc["memory_usage"], 1),
-                "disk_usage": 0,
-                "network_in": 0,
-                "network_out": 0,
-                "uptime": codex_proc["uptime_seconds"],
-                "tasks": [],
-                "last_update": now,
-                "api_calls": call_stats.get("by_source", {}).get("codex", {}).get("calls", 0),
-                "total_response_time": call_stats.get("total_response_time", 0),
-                "successful_calls": call_stats.get("by_source", {}).get("codex", {}).get("calls", 0),
-                "uptime_seconds": codex_proc["uptime_seconds"],
-                "start_time": time.strftime("%a %b %d %H:%M:%S %Y", time.localtime(now - codex_proc["uptime_seconds"])),
-                "mem_kb": codex_proc["mem_kb"],
-                "mem_mb": codex_proc["mem_mb"],
-                "version": "0.125.0",
-                "disk_size": "--",
-                "model": codex_model,
-                "running": codex_proc["running"],
-                "pid": codex_proc["pid"],
-            },
-            "hermes": {
-                "name": "Hermes",
-                "status": "online" if hermes_proc["running"] else "stopped",
-                "cpu_usage": round(hermes_proc["cpu_usage"], 1),
-                "memory_usage": round(hermes_proc["memory_usage"], 1),
-                "disk_usage": 0,
-                "network_in": 0,
-                "network_out": 0,
-                "uptime": hermes_proc["uptime_seconds"],
-                "tasks": [],
-                "last_update": now,
-                "api_calls": call_stats.get("by_source", {}).get("hermes", {}).get("calls", 0),
-                "total_response_time": 0,
-                "successful_calls": call_stats.get("by_source", {}).get("hermes", {}).get("calls", 0),
-                "uptime_seconds": hermes_proc["uptime_seconds"],
-                "start_time": time.strftime("%a %b %d %H:%M:%S %Y", time.localtime(now - hermes_proc["uptime_seconds"])),
-                "mem_kb": hermes_proc["mem_kb"],
-                "mem_mb": hermes_proc["mem_mb"],
-                "version": "unknown",
-                "disk_size": "unknown",
-                "model": hermes_model,
-                "running": hermes_proc["running"],
-                "pid": hermes_proc["pid"],
-            },
-        },
+        "agents": agents_status,
         "system_info": sys_info,
         "model_stats": {
             "total_calls": call_stats.get("total_calls", 0),
@@ -1222,8 +1352,8 @@ def _fallback_status() -> dict[str, Any]:
             "success_rate": 100,
             "active_connections": 0,
             "model_status": "running",
-            "model_id": codex_model,
-            "model_name": codex_model,
+            "model_id": primary_model,
+            "model_name": primary_model,
         },
         "panel_info": {
             "panel_version": _current_panel_version(),
@@ -1242,14 +1372,371 @@ def _du_dir(d: Path) -> str:
         return "--"
 
 
+# ─── agent config read/write ──────────────────────────────────────────────────
+
+def _get_agent_config(agent_id: str) -> dict[str, Any]:
+    """Get full config for an agent, including sensitive fields."""
+    agent_cfg = AGENT_DISCOVERY.get(agent_id)
+    if not agent_cfg:
+        return {"error": f"未知智能体: {agent_id}"}
+
+    config_path = agent_cfg.get("config_path")
+    if not config_path or not Path(config_path).exists():
+        return {
+            "agent_id": agent_id,
+            "label": agent_cfg.get("label", agent_id),
+            "config_path": str(config_path) if config_path else None,
+            "config_exists": False,
+            "model": "",
+            "provider": "",
+            "base_url": "",
+            "api_key": "",
+            "message": "配置文件不存在，请手动配置",
+        }
+
+    runtime = _read_agent_config(agent_id)
+    return {
+        "agent_id": agent_id,
+        "label": agent_cfg.get("label", agent_id),
+        "config_path": str(config_path),
+        "config_exists": True,
+        "model": runtime.get("model", ""),
+        "provider": runtime.get("provider", ""),
+        "base_url": runtime.get("base_url", ""),
+        "api_key": runtime.get("api_key", ""),
+        "systemd_service": agent_cfg.get("systemd_service", ""),
+        "listen_ports": agent_cfg.get("listen_ports", []),
+    }
+
+
+def _update_agent_config(agent_id: str, updates: dict[str, Any]) -> dict[str, Any]:
+    """Update agent config file. Supports codex (toml) and openclaw (yaml)."""
+    agent_cfg = AGENT_DISCOVERY.get(agent_id)
+    if not agent_cfg:
+        return {"success": False, "error": f"未知智能体: {agent_id}"}
+
+    config_path = agent_cfg.get("config_path")
+    if not config_path:
+        return {"success": False, "error": "该智能体不支持本地配置修改"}
+
+    config_path = Path(config_path)
+
+    if agent_id == "codex":
+        return _update_codex_config(config_path, updates)
+    elif agent_id == "openclaw":
+        return _update_openclaw_config(config_path, updates)
+    else:
+        return {"success": False, "error": f"不支持的智能体类型: {agent_id}"}
+
+
+def _update_codex_config(config_path: Path, updates: dict[str, Any]) -> dict[str, Any]:
+    """Update Codex config.toml."""
+    import shutil
+
+    raw = _safe_text(config_path) if config_path.exists() else ""
+    try:
+        config = tomllib.loads(raw) if raw else {}
+    except Exception:
+        config = {}
+    if not isinstance(config, dict):
+        config = {}
+
+    # Update top-level fields
+    if "model" in updates:
+        config["model"] = updates["model"]
+    if "model_provider" in updates:
+        config["model_provider"] = updates["model_provider"]
+
+    # Update model_providers
+    provider_name = updates.get("model_provider") or config.get("model_provider", "")
+    if provider_name and ("base_url" in updates or "model_provider" in updates):
+        providers_cfg = config.get("model_providers", {})
+        if not isinstance(providers_cfg, dict):
+            providers_cfg = {}
+        provider_cfg = providers_cfg.get(provider_name, {}) if isinstance(providers_cfg.get(provider_name), dict) else {}
+        if "base_url" in updates:
+            provider_cfg["base_url"] = updates["base_url"]
+        providers_cfg[provider_name] = provider_cfg
+        config["model_providers"] = providers_cfg
+
+    # Update auth.json if api_key provided
+    if "api_key" in updates and updates["api_key"]:
+        extra = AGENT_EXTRA_PATHS.get("codex", {})
+        auth_path = extra.get("auth_path")
+        if auth_path:
+            auth_path = Path(auth_path)
+            auth_data = {}
+            if auth_path.exists():
+                try:
+                    auth_data = json.loads(_safe_text(auth_path) or "{}")
+                except Exception:
+                    auth_data = {}
+            auth_data["OPENAI_API_KEY"] = updates["api_key"]
+            auth_path.parent.mkdir(parents=True, exist_ok=True)
+            auth_path.write_text(json.dumps(auth_data, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    # Write TOML (tomllib has no dump, use manual write)
+    toml_str = _dict_to_toml(config)
+
+    # Backup
+    if config_path.exists():
+        backup_path = config_path.with_suffix(".toml.bak")
+        shutil.copy2(str(config_path), str(backup_path))
+
+    config_path.write_text(toml_str, encoding="utf-8")
+    return {"success": True, "message": f"Codex 配置已更新: {config_path}"}
+
+
+def _update_openclaw_config(config_path: Path, updates: dict[str, Any]) -> dict[str, Any]:
+    """Update OpenClaw config.json."""
+    import shutil
+
+    raw = _safe_text(config_path) if config_path.exists() else ""
+    config: dict[str, Any] = {}
+    try:
+        parsed = json.loads(raw)
+        if isinstance(parsed, dict):
+            config = parsed
+    except Exception:
+        config = {}
+
+    # Update model at agents.defaults.model.primary
+    if "model" in updates:
+        agents_cfg = config.setdefault("agents", {})
+        defaults = agents_cfg.setdefault("defaults", {})
+        model_cfg = defaults.setdefault("model", {})
+        model_cfg["primary"] = updates["model"]
+
+    # Update provider info at models.providers.<name>
+    provider_name = updates.get("model_provider", "")
+    if provider_name and ("base_url" in updates or "api_key" in updates):
+        models_cfg = config.setdefault("models", {})
+        providers_cfg = models_cfg.setdefault("providers", {})
+        p_cfg = providers_cfg.get(provider_name, {}) if isinstance(providers_cfg.get(provider_name), dict) else {}
+        if "base_url" in updates:
+            p_cfg["baseUrl"] = updates["base_url"]
+        if "api_key" in updates:
+            p_cfg["apiKey"] = updates["api_key"]
+        providers_cfg[provider_name] = p_cfg
+
+    # Backup
+    if config_path.exists():
+        backup_path = config_path.with_suffix(".json.bak")
+        shutil.copy2(str(config_path), str(backup_path))
+
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(json.dumps(config, indent=2, ensure_ascii=False), encoding="utf-8")
+    return {"success": True, "message": f"OpenClaw 配置已更新: {config_path}"}
+
+
+def _dict_to_toml(d: dict[str, Any], prefix: str = "") -> str:
+    """Simple TOML serializer."""
+    lines: list[str] = []
+    # First pass: simple key-value pairs
+    for key, value in d.items():
+        if isinstance(value, dict):
+            # Check if it's a nested table or inline table
+            is_table = any(isinstance(v, dict) for v in value.values())
+            if is_table:
+                lines.append(f"\n[{key}]")
+                for k2, v2 in value.items():
+                    if isinstance(v2, dict):
+                        lines.append(f"\n[{key}.{k2}]")
+                        for k3, v3 in v2.items():
+                            lines.append(f"{k3} = {_toml_value(v3)}")
+                    else:
+                        lines.append(f"{k2} = {_toml_value(v2)}")
+            else:
+                # Inline table
+                inner = ", ".join('%s = %s' % (k2, _toml_value(v2)) for k2, v2 in value.items())
+                lines.append("%s = { %s }" % (key, inner))
+        elif isinstance(value, list):
+            lines.append(f"{key} = {_toml_value(value)}")
+        else:
+            lines.append(f"{key} = {_toml_value(value)}")
+    return "\n".join(lines) + "\n"
+
+
+def _toml_value(v: Any) -> str:
+    """Convert Python value to TOML literal."""
+    if isinstance(v, str):
+        return f'"{v}"'
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, (int, float)):
+        return str(v)
+    if isinstance(v, list):
+        return "[" + ", ".join(_toml_value(x) for x in v) + "]"
+    return f'"{str(v)}"'
+
+
+def _fetch_provider_models(base_url: str, api_key: str = "") -> dict[str, Any]:
+    """Fetch available models from a provider URL."""
+    if not base_url:
+        return {"success": False, "error": "base_url 不能为空"}
+    url = base_url.rstrip("/") + "/models"
+    req = urllib.request.Request(url=url, method="GET")
+    req.add_header("Accept", "application/json")
+    if api_key:
+        req.add_header("Authorization", f"Bearer {api_key}")
+    try:
+        with urllib.request.urlopen(req, timeout=LOCAL_MODEL_TIMEOUT) as resp:
+            body = resp.read().decode("utf-8", errors="replace")
+        payload = json.loads(body) if body else {}
+        models = _extract_model_entries(payload)
+        return {"success": True, "models": models, "count": len(models)}
+    except urllib.error.URLError as e:
+        return {"success": False, "error": f"连接失败: {e.reason}"}
+    except json.JSONDecodeError as e:
+        return {"success": False, "error": f"JSON 解析失败: {e}"}
+    except Exception as e:
+        return {"success": False, "error": f"未知错误: {e}"}
+
+
 # ─── fallback payload router ──────────────────────────────────────────────────
 
-def _fallback_payload(api_path: str, query: str = "") -> Any:
+def _fallback_payload(api_path: str, query: str = "", post_body: dict[str, Any] | None = None) -> Any:
     q = urllib.parse.parse_qs(query, keep_blank_values=True)
     service_id = (q.get("id") or ["服务"])[0]
     model_id = (q.get("model_id") or ["未知模型"])[0]
     skill_slug = (q.get("slug") or ["未知技能"])[0]
     period = (q.get("period") or ["all"])[0]
+    agent_id = (q.get("agent_id") or [""])[0]
+    base_url = (q.get("base_url") or [""])[0]
+    api_key = (q.get("api_key") or [""])[0]
+
+    # ── Agent Config API ──
+    if api_path == "/api/agent_config":
+        # GET: read config
+        if not agent_id:
+            # Return all agents' configs
+            return {aid: _get_agent_config(aid) for aid in AGENT_DISCOVERY}
+        return _get_agent_config(agent_id)
+
+    if api_path == "/api/agent_config/update":
+        if not post_body:
+            return {"success": False, "error": "需要 POST body"}
+        aid = post_body.get("agent_id", "")
+        if not aid:
+            return {"success": False, "error": "缺少 agent_id"}
+        updates = {k: v for k, v in post_body.items() if k != "agent_id"}
+        result = _update_agent_config(aid, updates)
+        # Clear model cache after config change
+        _MODEL_CACHE["expires_at"] = 0
+        return result
+
+    if api_path == "/api/agent_config/fetch_models":
+        return _fetch_provider_models(base_url, api_key)
+
+
+    # ── File Manager API ──
+    # Security: protected paths that cannot be deleted
+    _PROTECTED_PATHS = {
+        "/", "/bin", "/boot", "/dev", "/etc", "/lib", "/lib32", "/lib64",
+        "/proc", "/root", "/run", "/sbin", "/sys", "/usr", "/var",
+        "/home", "/opt", "/mnt", "/media", "/srv",
+        "/etc/passwd", "/etc/shadow", "/etc/hosts", "/etc/fstab",
+        "/etc/ssh", "/etc/nginx", "/etc/systemd",
+        "/var/log", "/var/lib", "/var/spool",
+        "/usr/bin", "/usr/sbin", "/usr/lib", "/usr/local",
+    }
+
+    def _is_protected_delete(path_str: str) -> bool:
+        """Check if a path is protected from deletion."""
+        p = Path(path_str).resolve()
+        # Always protect the panel directory itself
+        if str(p) == str(BASE_DIR) or str(p).startswith(str(BASE_DIR) + "/"):
+            return True
+        # Protect system-critical paths
+        for protected in _PROTECTED_PATHS:
+            pp = Path(protected).resolve()
+            if p == pp or str(p).startswith(str(pp) + "/"):
+                return True
+        return False
+
+    if api_path == "/api/files":
+        # GET: list files, POST: write/delete
+        from pathlib import Path as _P
+        rel_path = (q.get("path") or [""])[0]
+        # Security: only allow /root/.openclaw/workspace/
+        base = Path("/")
+        target = (base / rel_path.lstrip("/")).resolve()
+        if not str(target).startswith(str(base)):
+            return {"success": False, "error": "路径不在允许范围内"}
+        if not target.exists():
+            return {"success": False, "error": "路径不存在"}
+        if target.is_dir():
+            items = []
+            for item in sorted(target.iterdir()):
+                try:
+                    st = item.stat()
+                    items.append({
+                        "name": item.name,
+                        "is_dir": item.is_dir(),
+                        "size": st.st_size,
+                        "size_human": _format_bytes(st.st_size),
+                        "modified": time.strftime("%Y-%m-%d %H:%M", time.localtime(st.st_mtime)),
+                        "path": str(item.relative_to(base)),
+                    })
+                except Exception:
+                    continue
+            return {"success": True, "items": items, "path": str(target.relative_to(base))}
+        else:
+            try:
+                content = target.read_text(encoding="utf-8", errors="replace")
+                return {"success": True, "content": content, "path": str(target.relative_to(base))}
+            except Exception as e:
+                return {"success": False, "error": str(e)}
+
+    if api_path == "/api/files/write":
+        if not post_body:
+            return {"success": False, "error": "需要 POST body"}
+        rel_path = post_body.get("path", "")
+        file_content = post_body.get("content", "")
+        base = Path("/")
+        target = (base / rel_path.lstrip("/")).resolve()
+        if not str(target).startswith(str(base)):
+            return {"success": False, "error": "路径不在允许范围内"}
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(file_content, encoding="utf-8")
+            return {"success": True, "message": "已保存"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    if api_path == "/api/files/delete":
+        if not post_body:
+            return {"success": False, "error": "需要 POST body"}
+        rel_path = post_body.get("path", "")
+        base = Path("/")
+        target = (base / rel_path.lstrip("/")).resolve()
+        if not str(target).startswith(str(base)):
+            return {"success": False, "error": "路径不在允许范围内"}
+        if _is_protected_delete(str(target)):
+            return {"success": False, "error": "系统关键路径，禁止删除"}
+        try:
+            import shutil
+            if target.is_dir():
+                shutil.rmtree(target)
+            else:
+                target.unlink()
+            return {"success": True, "message": "已删除"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    if api_path == "/api/files/mkdir":
+        if not post_body:
+            return {"success": False, "error": "需要 POST body"}
+        rel_path = post_body.get("path", "")
+        base = Path("/")
+        target = (base / rel_path.lstrip("/")).resolve()
+        if not str(target).startswith(str(base)):
+            return {"success": False, "error": "路径不在允许范围内"}
+        try:
+            target.mkdir(parents=True, exist_ok=True)
+            return {"success": True, "message": "目录已创建"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
 
     if api_path == "/api/status":
         return _fallback_status()
@@ -1262,7 +1749,7 @@ def _fallback_payload(api_path: str, query: str = "") -> Any:
     if api_path == "/api/skills":
         return {
             "workspaceDir": str(BASE_DIR),
-            "managedSkillsDir": str(HERMES_SKILLS_DIR),
+            "managedSkillsDir": str(SKILL_SCAN_DIRS[0][0]) if SKILL_SCAN_DIRS else "",
             "skills": _scan_skills(),
         }
     if api_path == "/api/systems":
@@ -1275,11 +1762,13 @@ def _fallback_payload(api_path: str, query: str = "") -> Any:
     if api_path == "/api/changelog":
         return _fallback_changelog()
     if api_path == "/api/switch_model":
-        return {
-            "status": "error",
-            "success": False,
-            "message": f"模型 {model_id} 未切换：本地没有安全的模型切换实现，上游接口也不可用。",
-        }
+        aid = agent_id or q.get("agent", [""])[0]
+        mid = model_id or q.get("model", [""])[0]
+        if not aid or not mid:
+            return {"success": False, "error": "缺少 agent_id 或 model_id"}
+        result = _update_agent_config(aid, {"model": mid})
+        _MODEL_CACHE["expires_at"] = 0
+        return result
     if api_path == "/api/skills/install":
         return {"success": False, "message": f"技能 {skill_slug} 未安装：本地安装接口尚未接入。"}
     if api_path == "/api/skills/uninstall":
@@ -1297,23 +1786,14 @@ def _fallback_payload(api_path: str, query: str = "") -> Any:
         }
         msg = action_map.get(action, "操作完成")
 
-        # Map service id to systemd unit name
-        service_to_unit = {
-            "codex-standalone-webui": "codex-standalone-webui.service",
-            "hermes-gateway": "hermes-gateway.service",
-            "hermes-web-ui": "hermes-web-ui.service",
-            "nginx": "nginx.service",
-            "ssh": "ssh.service",
-            "football-web": "football-web.service",
-            "plotpilot": "plotpilot.service",
-            "ai-goofish-monitor": "ai-goofish-monitor.service",
-            "monitoring-panel": "ai-goofish-monitor.service",
-            "metapi": "metapi.service",
-            "uniagentd": "uniagentd.service",
-            "ces-uniagent": "ces-uniagent.service",
-            "cron": "cron.service",
-            "docker": "docker.service",
-        }
+        # Build service-to-unit map from discovered agents
+        service_to_unit: dict[str, str] = {}
+        for agent_id, cfg in AGENT_DISCOVERY.items():
+            svc = cfg.get("systemd_service")
+            if svc:
+                service_to_unit[agent_id] = svc
+                # Also map without -service suffix variants
+                service_to_unit[svc.replace(".service", "")] = svc
 
         # Panel server itself — just return info, don't actually kill it
         if service_id == "panel-server":
@@ -1324,7 +1804,6 @@ def _fallback_payload(api_path: str, query: str = "") -> Any:
             return {"success": False, "message": f"拒绝操作未知服务：{service_id}"}
 
         if action == "status":
-            import subprocess
             try:
                 r = subprocess.run(
                     ["systemctl", "is-active", unit],
@@ -1335,7 +1814,6 @@ def _fallback_payload(api_path: str, query: str = "") -> Any:
             except Exception as e:
                 return {"success": False, "message": f"查询状态失败: {e}"}
 
-        import subprocess
         try:
             r = subprocess.run(
                 ["systemctl", action, unit],
@@ -1391,30 +1869,24 @@ def _http_json(path_with_query: str, method: str = "GET", timeout: float | None 
 
 
 def _normalize_response(path: str, payload: Any) -> Any:
+    """Normalize response without hardcoded agent names.
+
+    Now handles all discovered agents dynamically.
+    """
     data = _replace_terms(payload)
 
     if path == "/api/status" and isinstance(data, dict):
         agents = data.setdefault("agents", {})
         if isinstance(agents, dict):
-            normalized_agents: dict[str, Any] = {}
-            for key, value in list(agents.items()):
-                normalized_agents[_normalize_agent_name(str(key))] = value
-            agents.clear()
-            agents.update(normalized_agents)
-
-        codex = agents.get("codex", {})
-        if isinstance(codex, dict):
-            codex["name"] = "Codex"
-        hermes = agents.get("hermes", {})
-        if isinstance(hermes, dict):
-            hermes["name"] = "Hermes"
+            # Set names from AGENT_DISCOVERY for any known agents
+            for agent_id, cfg in AGENT_DISCOVERY.items():
+                if agent_id in agents and isinstance(agents[agent_id], dict):
+                    agents[agent_id]["name"] = cfg["label"]
 
         if "model_stats" in data and isinstance(data["model_stats"], dict):
             model_stats = data["model_stats"]
             if "model_name" in model_stats and isinstance(model_stats["model_name"], str):
-                model_stats["model_name"] = model_stats["model_name"].replace("OpenClaw", "Codex")
-            if not model_stats.get("model_id") and isinstance(codex, dict):
-                model_stats["model_id"] = codex.get("model")
+                pass  # No replacement needed anymore
 
     if path == "/api/models" and isinstance(data, dict):
         available = data.get("available_models")
@@ -1424,45 +1896,8 @@ def _normalize_response(path: str, payload: Any) -> Any:
             else:
                 data["available_models"] = []
 
-        agent_models = data.setdefault("agent_models", {})
-        if isinstance(agent_models, dict):
-            normalized_agent_models: dict[str, Any] = {}
-            for key, value in list(agent_models.items()):
-                normalized_agent_models[_normalize_agent_name(str(key))] = value
-            agent_models.clear()
-            agent_models.update(normalized_agent_models)
-
-        agent_model_lists = data.setdefault("agent_model_lists", {})
-        if isinstance(agent_model_lists, dict):
-            normalized_lists: dict[str, list[str]] = {}
-            for key, value in list(agent_model_lists.items()):
-                if isinstance(value, list):
-                    normalized_lists[_normalize_agent_name(str(key))] = [str(v) for v in value]
-            agent_model_lists.clear()
-            agent_model_lists.update(normalized_lists)
-
-        if "codex" not in agent_models:
-            status_agents = (((data.get("status") or {}) if isinstance(data.get("status"), dict) else {}).get("agents") or {})
-            if isinstance(status_agents, dict):
-                codex_status = status_agents.get("codex")
-                if isinstance(codex_status, dict) and codex_status.get("model"):
-                    agent_models["codex"] = codex_status["model"]
-
-        if "hermes" not in agent_models:
-            status_agents = (((data.get("status") or {}) if isinstance(data.get("status"), dict) else {}).get("agents") or {})
-            if isinstance(status_agents, dict):
-                hermes_status = status_agents.get("hermes")
-                if isinstance(hermes_status, dict) and hermes_status.get("model"):
-                    agent_models["hermes"] = hermes_status["model"]
-
     if path == "/api/call_stats" and isinstance(data, dict):
-        by_source = data.setdefault("by_source", {})
-        if isinstance(by_source, dict):
-            normalized_source: dict[str, Any] = {}
-            for key, value in list(by_source.items()):
-                normalized_source[_normalize_agent_name(str(key))] = value
-            by_source.clear()
-            by_source.update(normalized_source)
+        pass  # by_source keys are already agent IDs
 
     if path == "/api/changelog" and isinstance(data, dict):
         entries = data.get("entries")
@@ -1476,25 +1911,6 @@ def _map_query_for_upstream(path: str, query: str) -> str:
     if not query:
         return ""
     q = urllib.parse.parse_qs(query, keep_blank_values=True)
-
-    if path == "/api/switch_model":
-        agent = q.get("agent", [])
-        if agent:
-            normalized = _normalize_agent_name(agent[0])
-            if normalized == "codex":
-                q["agent"] = ["openclaw"]
-            elif normalized == "hermes":
-                q["agent"] = ["he"]
-
-    if path.startswith("/api/service/"):
-        service_id = q.get("id", [])
-        if service_id:
-            mapped = service_id[0].replace("codex", "openclaw").replace("hermes", "he")
-            q["id"] = [mapped]
-
-    if path.startswith("/api/sessions/"):
-        pass
-
     return urllib.parse.urlencode(q, doseq=True)
 
 
@@ -1661,9 +2077,7 @@ class PanelHandler(SimpleHTTPRequestHandler):
 
         while True:
             try:
-                status, payload = _http_json("/api/status", method="GET", timeout=SSE_UPSTREAM_TIMEOUT)
-                if status >= 400 or not isinstance(payload, dict):
-                    payload = _fallback_status()
+                payload = _fallback_status()
             except Exception:
                 payload = _fallback_status()
 
@@ -1705,7 +2119,7 @@ class PanelHandler(SimpleHTTPRequestHandler):
             return
 
         # Force local data for endpoints where upstream lacks our agent data
-        _force_local = {"/api/status", "/api/call_stats", "/api/sessions", "/api/skills", "/api/systems", "/api/changelog", "/api/models"}
+        _force_local = {"/api/status", "/api/call_stats", "/api/sessions", "/api/skills", "/api/systems", "/api/changelog", "/api/models", "/api/agent_config", "/api/agent_config/fetch_models", "/api/files", "/api/files/write", "/api/files/delete", "/api/files/mkdir", "/api/files/upload"}
         # Service control must always hit local fallback (real systemctl), never upstream
         if method == "GET" and (path in _force_local or path.startswith("/api/service/")):
             fallback = _fallback_payload(path, query)
@@ -1717,7 +2131,81 @@ class PanelHandler(SimpleHTTPRequestHandler):
             self._proxy_json(path, query, method="GET")
             return
 
+
+        if method == "POST" and path == "/api/files/upload":
+            import cgi
+            content_type = self.headers.get("Content-Type", "")
+            base = Path("/")
+            # Support both multipart and JSON base64 upload
+            if content_type.startswith("application/json"):
+                body = self._read_json_body()
+                rel_path = body.get("path", "")
+                file_content = body.get("content", "")
+                encoding = body.get("encoding", "utf-8")
+                if not rel_path:
+                    self._send_json(400, {"success": False, "error": "缺少 path"})
+                    return
+                target = (base / rel_path).resolve()
+                if not str(target).startswith(str(base)):
+                    self._send_json(400, {"success": False, "error": "路径不在允许范围内"})
+                    return
+                try:
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    if encoding == "base64":
+                        import base64 as _b64
+                        raw = _b64.b64decode(file_content)
+                        with open(target, "wb") as f:
+                            f.write(raw)
+                    else:
+                        target.write_text(file_content, encoding="utf-8")
+                    self._send_json(200, {"success": True, "message": "上传成功", "path": str(target.relative_to(base))})
+                except Exception as e:
+                    self._send_json(500, {"success": False, "error": str(e)})
+                return
+            if "multipart/form-data" in content_type:
+                # Parse multipart form data
+                form = cgi.FieldStorage(fp=self.rfile, headers=self.headers, environ={"REQUEST_METHOD": "POST", "CONTENT_TYPE": content_type})
+                rel_path = ""
+                file_data = None
+                file_name = ""
+                for key in form.keys():
+                    item = form[key]
+                    if key == "path":
+                        rel_path = item.value if isinstance(item.value, str) else ""
+                    elif key == "file":
+                        file_data = item.file.read() if item.file else None
+                        file_name = item.filename or ""
+                base = Path("/")
+                if rel_path:
+                    target = (base / rel_path).resolve()
+                else:
+                    target = base / file_name
+                target = target.resolve()
+                if not str(target).startswith(str(base)):
+                    self._send_json(400, {"success": False, "error": "路径不在允许范围内"})
+                    return
+                try:
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    with open(target, "wb") as f:
+                        f.write(file_data or b"")
+                    self._send_json(200, {"success": True, "message": "上传成功", "path": str(target.relative_to(base))})
+                except Exception as e:
+                    self._send_json(500, {"success": False, "error": str(e)})
+                return
         if method == "POST" and path.startswith("/api/"):
+            if path in {"/api/agent_config/update", "/api/agent_config/fetch_models"}:
+                body = self._read_json_body()
+                fallback = _fallback_payload(path, query, post_body=body)
+                payload = _normalize_response(path, fallback)
+                self._send_json(200, payload)
+                return
+            # File manager API — handle locally
+            if path in {"/api/files/write", "/api/files/delete", "/api/files/mkdir"}:
+                body = self._read_json_body()
+                result = _fallback_payload(path, query, post_body=body)
+                self._send_json(200, result)
+                return
+            # Upload already handled above
             self._proxy_json(path, query, method="POST")
             return
 
