@@ -10,71 +10,160 @@
     <link rel="stylesheet" href="theme.css?v=20260429">
     <link rel="stylesheet" href="navbar.css?v=20260429">
     <style>
-        /* ===== 像素风游戏界面 ===== */
+        /* ===== 2.5D 等轴测像素风 ===== */
         .pixel-font { font-family: 'Press Start 2P', monospace; }
 
+        /* 游戏舞台 - 深色网格背景 */
         .game-stage {
             position: relative;
             width: 100%;
-            min-height: 520px;
-            background: linear-gradient(180deg, #1a1c2e 0%, #16182a 40%, #1e2030 60%, #252838 100%);
-            border: 2px solid rgba(255,255,255,0.08);
+            min-height: 560px;
+            background: linear-gradient(180deg, #0d0f1a 0%, #111322 50%, #0f1118 100%);
+            border: 2px solid rgba(255,255,255,0.06);
             border-radius: 14px;
             overflow: hidden;
             margin-bottom: 20px;
             image-rendering: pixelated;
         }
 
-        /* 像素网格背景 */
-        .pixel-grid {
+        /* 等轴测网格地面 */
+        .iso-ground {
             position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background-image:
-                linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
-            background-size: 16px 16px;
-            pointer-events: none;
-            z-index: 0;
+            bottom: 0; left: 0; right: 0; height: 65%;
+            background:
+                linear-gradient(135deg, rgba(99,102,241,0.03) 25%, transparent 25%),
+                linear-gradient(225deg, rgba(99,102,241,0.03) 25%, transparent 25%),
+                linear-gradient(315deg, rgba(99,102,241,0.03) 25%, transparent 25%),
+                linear-gradient(45deg, rgba(99,102,241,0.03) 25%, transparent 25%);
+            background-size: 32px 32px;
+            background-position: 0 0, 16px 0, 16px -16px, 0 16px;
+            border-top: 1px solid rgba(99,102,241,0.08);
         }
 
-        /* 地面 */
-        .pixel-ground {
+        /* 等轴测网格线 */
+        .iso-grid {
             position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: 80px;
-            background: linear-gradient(0deg, #2a2d3e 0%, #232635 60%, transparent 100%);
-            border-top: 2px solid rgba(99,102,241,0.2);
-            z-index: 1;
+            bottom: 0; left: 0; right: 0; height: 65%;
+            background-image:
+                linear-gradient(45deg, rgba(255,255,255,0.015) 1px, transparent 1px),
+                linear-gradient(-45deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+            background-size: 24px 24px;
+            pointer-events: none;
         }
-        .pixel-ground::before {
+
+        /* 远景装饰 - 等轴测建筑剪影 */
+        .iso-bg-building {
+            position: absolute;
+            bottom: 60%;
+            z-index: 1;
+            opacity: 0.15;
+        }
+
+        /* 工位区域 - 等轴测办公桌 */
+        .desk-station {
+            position: absolute;
+            z-index: 5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* 等轴测桌子 */
+        .iso-desk {
+            position: relative;
+            width: 120px;
+            height: 64px;
+        }
+        .iso-desk-top {
+            position: absolute;
+            top: 0; left: 10px;
+            width: 100px; height: 40px;
+            background: linear-gradient(135deg, #2a2d3e 0%, #1e2030 100%);
+            border: 2px solid rgba(99,102,241,0.2);
+            border-radius: 4px;
+            transform: perspective(200px) rotateX(5deg);
+        }
+        .iso-desk-front {
+            position: absolute;
+            top: 38px; left: 10px;
+            width: 100px; height: 20px;
+            background: linear-gradient(180deg, #1e2030 0%, #16182a 100%);
+            border: 2px solid rgba(99,102,241,0.15);
+            border-top: none;
+            border-radius: 0 0 4px 4px;
+        }
+        /* 显示器 */
+        .iso-monitor {
+            position: absolute;
+            top: -36px; left: 30px;
+            width: 60px; height: 40px;
+            background: #1a1c2e;
+            border: 2px solid rgba(99,102,241,0.3);
+            border-radius: 3px;
+        }
+        .iso-monitor::after {
             content: '';
             position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 2px;
+            top: 4px; left: 4px;
+            right: 4px; bottom: 4px;
+            background: linear-gradient(135deg, rgba(99,102,241,0.15) 0%, rgba(6,182,212,0.1) 100%);
+            border-radius: 1px;
+        }
+        .iso-monitor-stand {
+            position: absolute;
+            top: 4px; left: 50%;
+            transform: translateX(-50%);
+            width: 8px; height: 10px;
+            background: #2a2d3e;
+            border: 1px solid rgba(99,102,241,0.2);
+        }
+        /* 键盘 */
+        .iso-keyboard {
+            position: absolute;
+            top: 4px; left: 38px;
+            width: 44px; height: 14px;
+            background: #1e2030;
+            border: 1px solid rgba(99,102,241,0.15);
+            border-radius: 2px;
+        }
+        .iso-keyboard::after {
+            content: '';
+            position: absolute;
+            top: 2px; left: 2px;
+            right: 2px; bottom: 2px;
             background: repeating-linear-gradient(90deg,
-                rgba(99,102,241,0.3) 0px,
-                rgba(99,102,241,0.3) 8px,
-                transparent 8px,
-                transparent 16px
+                rgba(99,102,241,0.1) 0px,
+                rgba(99,102,241,0.1) 3px,
+                transparent 3px,
+                transparent 5px
             );
         }
-
-        /* 装饰性建筑/树 */
-        .pixel-decoration {
+        /* 椅子 */
+        .iso-chair {
             position: absolute;
-            bottom: 78px;
-            z-index: 2;
-            opacity: 0.6;
+            top: 10px; left: 50%;
+            transform: translateX(-50%);
+            width: 28px; height: 24px;
+        }
+        .iso-chair-seat {
+            width: 28px; height: 10px;
+            background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+            border: 2px solid rgba(99,102,241,0.4);
+            border-radius: 3px;
+        }
+        .iso-chair-back {
+            position: absolute;
+            top: -14px; left: 3px;
+            width: 22px; height: 16px;
+            background: linear-gradient(180deg, #4f46e5 0%, #3730a3 100%);
+            border: 2px solid rgba(99,102,241,0.3);
+            border-bottom: none;
+            border-radius: 3px 3px 0 0;
         }
 
-        /* Agent 像素角色容器 */
-        .agent-character {
+        /* ===== 2.5D 等轴测像素角色 ===== */
+        .iso-character {
             position: absolute;
-            bottom: 78px;
             z-index: 10;
             display: flex;
             flex-direction: column;
@@ -82,21 +171,33 @@
             cursor: pointer;
             transition: transform 0.3s ease;
         }
-        .agent-character:hover {
-            transform: translateY(-8px);
+        .iso-character:hover {
+            transform: translateY(-6px);
         }
 
-        /* 像素角色 */
-        .pixel-sprite {
-            width: 64px;
+        /* 角色精灵容器 */
+        .sprite-container {
+            width: 48px;
             height: 64px;
             position: relative;
-            image-rendering: pixelated;
         }
 
-        /* 角色状态指示器 */
+        /* 角色阴影 */
+        .sprite-shadow {
+            position: absolute;
+            bottom: -4px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 32px;
+            height: 8px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 50%;
+            z-index: -1;
+        }
+
+        /* 状态标签 */
         .status-badge {
-            margin-top: 6px;
+            margin-top: 8px;
             padding: 3px 10px;
             border-radius: 4px;
             font-size: 10px;
@@ -126,7 +227,6 @@
             50% { opacity: 0.7; }
         }
 
-        /* 角色名字 */
         .agent-name {
             margin-top: 4px;
             font-size: 11px;
@@ -139,66 +239,100 @@
         /* 对话气泡 */
         .speech-bubble {
             position: absolute;
-            top: -40px;
+            top: -36px;
             left: 50%;
             transform: translateX(-50%);
             background: rgba(255,255,255,0.95);
             color: #1a1a2e;
-            padding: 6px 12px;
-            border-radius: 8px;
-            font-size: 11px;
+            padding: 5px 10px;
+            border-radius: 6px;
+            font-size: 10px;
             font-weight: 600;
             white-space: nowrap;
             opacity: 0;
             transition: opacity 0.3s ease, top 0.3s ease;
             pointer-events: none;
             z-index: 20;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
         }
         .speech-bubble::after {
             content: '';
             position: absolute;
-            bottom: -6px;
+            bottom: -5px;
             left: 50%;
             transform: translateX(-50%);
-            border-left: 6px solid transparent;
-            border-right: 6px solid transparent;
-            border-top: 6px solid rgba(255,255,255,0.95);
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            border-top: 5px solid rgba(255,255,255,0.95);
         }
-        .agent-character:hover .speech-bubble {
+        .iso-character:hover .speech-bubble {
             opacity: 1;
-            top: -48px;
+            top: -44px;
         }
 
-        /* 工作中的动画 - 角色轻微上下跳动 */
-        @keyframes workingBounce {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-4px); }
+        /* ===== 工作状态动画 ===== */
+        /* 角色在工位旁快速敲键盘 */
+        @keyframes workingType {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            25% { transform: translateY(-1px) rotate(-0.5deg); }
+            50% { transform: translateY(0) rotate(0.5deg); }
+            75% { transform: translateY(-1px) rotate(-0.5deg); }
         }
-        .agent-character.working .pixel-sprite {
-            animation: workingBounce 0.8s ease-in-out infinite;
+        .iso-character.working .sprite-container {
+            animation: workingType 0.3s ease-in-out infinite;
+        }
+        /* 键盘闪烁 */
+        @keyframes keyboardGlow {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+        .iso-character.working .iso-keyboard::after {
+            animation: keyboardGlow 0.3s ease-in-out infinite;
+        }
+        /* 显示器发光 */
+        @keyframes monitorGlow {
+            0%, 100% { box-shadow: 0 0 4px rgba(99,102,241,0.2); }
+            50% { box-shadow: 0 0 12px rgba(99,102,241,0.4); }
+        }
+        .iso-character.working .iso-monitor {
+            animation: monitorGlow 1.5s ease-in-out infinite;
         }
 
-        /* 偷懒动画 - 角色左右摇晃 */
-        @keyframes idleWobble {
+        /* ===== 休息状态动画 ===== */
+        /* 角色在场景里闲逛 */
+        @keyframes idleWander {
+            0% { transform: translateX(0) translateY(0); }
+            15% { transform: translateX(12px) translateY(-3px); }
+            30% { transform: translateX(20px) translateY(0); }
+            45% { transform: translateX(15px) translateY(-5px); }
+            60% { transform: translateX(5px) translateY(-2px); }
+            75% { transform: translateX(-8px) translateY(-4px); }
+            90% { transform: translateX(-3px) translateY(0); }
+            100% { transform: translateX(0) translateY(0); }
+        }
+        .iso-character.idle {
+            animation: idleWander 8s ease-in-out infinite;
+        }
+        /* 摸鱼时的悠闲摇摆 */
+        @keyframes idleSway {
             0%, 100% { transform: rotate(0deg); }
-            25% { transform: rotate(-3deg); }
-            75% { transform: rotate(3deg); }
+            30% { transform: rotate(-2deg); }
+            70% { transform: rotate(2deg); }
         }
-        .agent-character.idle .pixel-sprite {
-            animation: idleWobble 3s ease-in-out infinite;
-        }
-
-        /* 离线动画 - 角色变灰 */
-        .agent-character.offline .pixel-sprite {
-            filter: grayscale(0.8) brightness(0.6);
+        .iso-character.idle .sprite-container {
+            animation: idleSway 3s ease-in-out infinite;
         }
 
-        /* 像素角色 SVG 样式 */
-        .sprite-body { fill: currentColor; }
-        .sprite-outline { fill: none; stroke: rgba(0,0,0,0.3); stroke-width: 2; }
+        /* 离线状态 */
+        .iso-character.offline .sprite-container {
+            filter: grayscale(0.7) brightness(0.5);
+        }
+        .iso-character.offline .iso-desk-top,
+        .iso-character.offline .iso-monitor {
+            opacity: 0.4;
+        }
 
-        /* 状态栏 HUD */
+        /* ===== HUD 状态栏 ===== */
         .hud-bar {
             display: flex;
             align-items: center;
@@ -215,40 +349,6 @@
         .hud-stat i { font-size: 14px; }
         .hud-stat .value { font-weight: 700; color: var(--text-primary); }
         .hud-divider { width: 1px; height: 20px; background: rgba(255,255,255,0.08); }
-
-        /* 像素风按钮 */
-        .btn-pixel {
-            padding: 8px 16px;
-            border: 2px solid;
-            border-radius: 6px;
-            font-size: 12px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.15s ease;
-            position: relative;
-            image-rendering: pixelated;
-        }
-        .btn-pixel:active {
-            transform: translateY(2px);
-        }
-        .btn-pixel-primary {
-            background: var(--accent-1);
-            border-color: #4f46e5;
-            color: white;
-        }
-        .btn-pixel-primary:hover {
-            background: #4f46e5;
-            box-shadow: 0 0 12px rgba(99,102,241,0.4);
-        }
-        .btn-pixel-ghost {
-            background: transparent;
-            border-color: rgba(255,255,255,0.15);
-            color: var(--text-secondary);
-        }
-        .btn-pixel-ghost:hover {
-            border-color: rgba(255,255,255,0.3);
-            color: var(--text-primary);
-        }
 
         /* 角色详情面板 */
         .character-panel {
@@ -288,7 +388,6 @@
         .stat-item .label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
         .stat-item .value { font-size: 18px; font-weight: 800; }
 
-        /* 迷你像素图标 */
         .mini-icon {
             width: 24px;
             height: 24px;
@@ -306,7 +405,7 @@
 
         /* 响应式 */
         @media (max-width: 768px) {
-            .pixel-sprite { width: 48px; height: 48px; }
+            .sprite-container { width: 36px; height: 48px; }
             .hud-bar { flex-direction: column; gap: 10px; }
             .hud-left, .hud-right { flex-wrap: wrap; justify-content: center; }
         }
@@ -335,61 +434,39 @@
         </div>
     </div>
 
-    <!-- 游戏舞台 -->
+    <!-- 2.5D 等轴测游戏舞台 -->
     <div class="game-stage" id="gameStage">
-        <div class="pixel-grid"></div>
+        <div class="iso-ground"></div>
+        <div class="iso-grid"></div>
 
-        <!-- 装饰：左侧树 -->
-        <div class="pixel-decoration" style="left:60px;">
-            <svg width="48" height="64" viewBox="0 0 48 64">
-                <rect x="20" y="40" width="8" height="24" fill="#5d4037" rx="1"/>
-                <rect x="8" y="20" width="32" height="24" fill="#2e7d32" rx="2"/>
-                <rect x="14" y="8" width="20" height="18" fill="#388e3c" rx="2"/>
-                <rect x="18" y="0" width="12" height="12" fill="#43a047" rx="2"/>
+        <!-- 远景建筑剪影 -->
+        <div class="iso-bg-building" style="left:5%;">
+            <svg width="80" height="100" viewBox="0 0 80 100">
+                <rect x="10" y="20" width="60" height="80" fill="#1a1c2e" rx="2"/>
+                <rect x="0" y="40" width="80" height="60" fill="#16182a" rx="2"/>
+                <rect x="16" y="26" width="10" height="10" fill="rgba(99,102,241,0.15)" rx="1"/>
+                <rect x="36" y="26" width="10" height="10" fill="rgba(99,102,241,0.1)" rx="1"/>
+                <rect x="56" y="26" width="10" height="10" fill="rgba(99,102,241,0.12)" rx="1"/>
+                <rect x="16" y="46" width="10" height="10" fill="rgba(99,102,241,0.08)" rx="1"/>
+                <rect x="36" y="46" width="10" height="10" fill="rgba(99,102,241,0.15)" rx="1"/>
+                <rect x="56" y="46" width="10" height="10" fill="rgba(99,102,241,0.06)" rx="1"/>
+                <rect x="26" y="70" width="28" height="30" fill="#0d0f1a" rx="2"/>
+            </svg>
+        </div>
+        <div class="iso-bg-building" style="right:8%;">
+            <svg width="60" height="80" viewBox="0 0 60 80">
+                <rect x="8" y="16" width="44" height="64" fill="#1a1c2e" rx="2"/>
+                <rect x="0" y="30" width="60" height="50" fill="#16182a" rx="2"/>
+                <rect x="12" y="22" width="8" height="8" fill="rgba(6,182,212,0.1)" rx="1"/>
+                <rect x="28" y="22" width="8" height="8" fill="rgba(6,182,212,0.12)" rx="1"/>
+                <rect x="44" y="22" width="8" height="8" fill="rgba(6,182,212,0.08)" rx="1"/>
+                <rect x="12" y="40" width="8" height="8" fill="rgba(6,182,212,0.15)" rx="1"/>
+                <rect x="28" y="40" width="8" height="8" fill="rgba(6,182,212,0.06)" rx="1"/>
+                <rect x="44" y="40" width="8" height="8" fill="rgba(6,182,212,0.1)" rx="1"/>
             </svg>
         </div>
 
-        <!-- 装饰：右侧建筑 -->
-        <div class="pixel-decoration" style="right:80px;">
-            <svg width="56" height="80" viewBox="0 0 56 80">
-                <rect x="8" y="24" width="40" height="56" fill="#37474f" rx="1"/>
-                <rect x="0" y="40" width="56" height="40" fill="#455a64" rx="1"/>
-                <rect x="14" y="30" width="8" height="8" fill="#fff9c4" rx="1" opacity="0.8"/>
-                <rect x="30" y="30" width="8" height="8" fill="#fff9c4" rx="1" opacity="0.6"/>
-                <rect x="14" y="46" width="8" height="8" fill="#fff9c4" rx="1" opacity="0.4"/>
-                <rect x="30" y="46" width="8" height="8" fill="#fff9c4" rx="1" opacity="0.7"/>
-                <rect x="22" y="60" width="12" height="20" fill="#5d4037" rx="1"/>
-            </svg>
-        </div>
-
-        <!-- 装饰：云朵 -->
-        <div class="pixel-decoration" style="top:20px;left:25%;">
-            <svg width="64" height="28" viewBox="0 0 64 28">
-                <rect x="12" y="8" width="40" height="12" fill="rgba(255,255,255,0.06)" rx="3"/>
-                <rect x="20" y="4" width="24" height="10" fill="rgba(255,255,255,0.08)" rx="3"/>
-                <rect x="8" y="12" width="16" height="8" fill="rgba(255,255,255,0.05)" rx="2"/>
-            </svg>
-        </div>
-        <div class="pixel-decoration" style="top:36px;right:20%;">
-            <svg width="48" height="22" viewBox="0 0 48 22">
-                <rect x="8" y="6" width="32" height="10" fill="rgba(255,255,255,0.05)" rx="3"/>
-                <rect x="14" y="2" width="20" height="8" fill="rgba(255,255,255,0.07)" rx="2"/>
-            </svg>
-        </div>
-
-        <!-- 装饰：小草 -->
-        <div class="pixel-decoration" style="left:200px;bottom:78px;">
-            <svg width="32" height="16" viewBox="0 0 32 16">
-                <rect x="4" y="8" width="3" height="8" fill="#2e7d32" rx="1"/>
-                <rect x="10" y="4" width="3" height="12" fill="#388e3c" rx="1"/>
-                <rect x="16" y="6" width="3" height="10" fill="#2e7d32" rx="1"/>
-                <rect x="22" y="3" width="3" height="13" fill="#43a047" rx="1"/>
-                <rect x="27" y="7" width="3" height="9" fill="#2e7d32" rx="1"/>
-            </svg>
-        </div>
-
-        <!-- Agent 角色将由 JS 动态生成 -->
-        <div class="pixel-ground"></div>
+        <!-- Agent 角色和工位将由 JS 动态生成 -->
     </div>
 
     <!-- 角色详情面板 -->
@@ -400,7 +477,7 @@
 
     <!-- 底部信息 -->
     <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;color:var(--text-muted);font-size:12px;">
-        <span><i class="fas fa-gamepad"></i> 像素工坊 v1.0 — 点击角色查看详情</span>
+        <span><i class="fas fa-gamepad"></i> 像素工坊 v2.0 — 2.5D 等轴测 · 点击角色查看详情</span>
         <span id="lastUpdate">--</span>
     </div>
 </div>
@@ -408,148 +485,203 @@
 <script>
 const API_HOST = window.location.origin;
 
-// ===== 像素角色 SVG 生成 =====
-function generatePixelSprite(agentId, status) {
+// ===== 2.5D 等轴测角色 SVG =====
+// 工作中：站在工位旁，快速敲键盘姿态
+function spriteWorking(agentId) {
     const colors = {
-        openclaw: { primary: '#6366f1', secondary: '#818cf8', accent: '#4f46e5', skin: '#fcd5b8', hair: '#5d4037' },
-        codex:    { primary: '#06b6d4', secondary: '#22d3ee', accent: '#0891b2', skin: '#fcd5b8', hair: '#1a1a2e' },
+        openclaw: { shirt: '#6366f1', pants: '#3730a3', skin: '#fcd5b8', hair: '#5d4037', shoe: '#1e1b4b' },
+        codex:    { shirt: '#06b6d4', pants: '#0e7490', skin: '#fcd5b8', hair: '#1a1a2e', shoe: '#0c4a6e' },
     };
     const c = colors[agentId] || colors.openclaw;
-
-    // 根据状态选择姿态
-    if (status === 'online') {
-        // 工作姿态：坐着敲电脑
-        return `<svg width="64" height="64" viewBox="0 0 64 64">
-            <!-- 椅子 -->
-            <rect x="16" y="44" width="24" height="4" fill="#5d4037" rx="1"/>
-            <rect x="18" y="48" width="4" height="12" fill="#5d4037"/>
-            <rect x="34" y="48" width="4" height="12" fill="#5d4037"/>
-            <rect x="14" y="34" width="4" height="12" fill="#5d4037"/>
-            <rect x="14" y="34" width="24" height="4" fill="#5d4037" rx="1"/>
-            <!-- 桌子 -->
-            <rect x="4" y="36" width="40" height="4" fill="#8d6e63" rx="1"/>
-            <!-- 腿 -->
-            <rect x="20" y="40" width="4" height="6" fill="${c.accent}"/>
-            <rect x="32" y="40" width="4" height="6" fill="${c.accent}"/>
-            <!-- 身体 -->
-            <rect x="18" y="26" width="20" height="16" fill="${c.primary}" rx="2"/>
-            <!-- 手臂（敲键盘姿势） -->
-            <rect x="10" y="28" width="8" height="4" fill="${c.skin}" rx="1"/>
-            <rect x="38" y="28" width="8" height="4" fill="${c.skin}" rx="1"/>
-            <!-- 键盘 -->
-            <rect x="10" y="38" width="28" height="3" fill="#455a64" rx="1"/>
-            <rect x="12" y="38" width="3" height="3" fill="#607d8b" rx="1"/>
-            <rect x="17" y="38" width="3" height="3" fill="#607d8b" rx="1"/>
-            <rect x="22" y="38" width="3" height="3" fill="#607d8b" rx="1"/>
-            <rect x="27" y="38" width="3" height="3" fill="#607d8b" rx="1"/>
-            <rect x="32" y="38" width="3" height="3" fill="#607d8b" rx="1"/>
-            <!-- 头 -->
-            <rect x="20" y="14" width="16" height="14" fill="${c.skin}" rx="2"/>
-            <!-- 头发 -->
-            <rect x="18" y="10" width="20" height="6" fill="${c.hair}" rx="2"/>
-            <rect x="18" y="14" width="4" height="4" fill="${c.hair}"/>
-            <rect x="34" y="14" width="4" height="4" fill="${c.hair}"/>
-            <!-- 眼睛（专注） -->
-            <rect x="23" y="20" width="3" height="2" fill="#1a1a2e" rx="1"/>
-            <rect x="30" y="20" width="3" height="2" fill="#1a1a2e" rx="1"/>
-            <!-- 嘴巴（认真） -->
-            <rect x="26" y="24" width="4" height="1" fill="#e57373" rx="1"/>
-            <!-- 显示器 -->
-            <rect x="44" y="18" width="16" height="12" fill="#37474f" rx="1"/>
-            <rect x="46" y="20" width="12" height="8" fill="${c.secondary}" rx="1" opacity="0.3"/>
-            <rect x="50" y="30" width="4" height="4" fill="#5d4037"/>
-        </svg>`;
-    } else if (status === 'offline') {
-        // 离线姿态：躺着
-        return `<svg width="64" height="64" viewBox="0 0 64 64">
-            <!-- 身体（横躺） -->
-            <rect x="8" y="38" width="32" height="12" fill="${c.primary}" rx="3" opacity="0.6"/>
-            <!-- 头 -->
-            <rect x="4" y="34" width="14" height="12" fill="${c.skin}" rx="2" opacity="0.7"/>
-            <!-- 闭眼 -->
-            <rect x="6" y="40" width="4" height="1" fill="#1a1a2e" rx="1"/>
-            <!-- ZZZ -->
-            <rect x="42" y="26" width="6" height="6" fill="rgba(255,255,255,0.4)" rx="1"/>
-            <rect x="50" y="18" width="5" height="5" fill="rgba(255,255,255,0.3)" rx="1"/>
-            <rect x="56" y="12" width="4" height="4" fill="rgba(255,255,255,0.2)" rx="1"/>
-            <!-- 腿 -->
-            <rect x="36" y="42" width="8" height="6" fill="${c.accent}" rx="2" opacity="0.5"/>
-        </svg>`;
-    } else {
-        // 偷懒/休息姿态：坐着喝茶
-        return `<svg width="64" height="64" viewBox="0 0 64 64">
-            <!-- 椅子 -->
-            <rect x="18" y="44" width="20" height="4" fill="#5d4037" rx="1"/>
-            <rect x="20" y="48" width="4" height="12" fill="#5d4037"/>
-            <rect x="32" y="48" width="4" height="12" fill="#5d4037"/>
-            <rect x="14" y="34" width="4" height="12" fill="#5d4037"/>
-            <rect x="14" y="34" width="22" height="4" fill="#5d4037" rx="1"/>
-            <!-- 腿 -->
-            <rect x="22" y="40" width="4" height="6" fill="${c.accent}"/>
-            <rect x="30" y="40" width="4" height="6" fill="${c.accent}"/>
-            <!-- 身体 -->
-            <rect x="20" y="26" width="16" height="16" fill="${c.primary}" rx="2"/>
-            <!-- 手臂（托茶杯） -->
-            <rect x="12" y="30" width="8" height="4" fill="${c.skin}" rx="1"/>
-            <rect x="36" y="28" width="8" height="4" fill="${c.skin}" rx="1"/>
-            <!-- 茶杯 -->
-            <rect x="42" y="24" width="10" height="8" fill="#e0e0e0" rx="2"/>
-            <rect x="44" y="26" width="6" height="4" fill="#8d6e63" rx="1"/>
-            <!-- 蒸汽 -->
-            <rect x="46" y="18" width="2" height="4" fill="rgba(255,255,255,0.3)" rx="1"/>
-            <rect x="49" y="20" width="2" height="3" fill="rgba(255,255,255,0.2)" rx="1"/>
-            <!-- 头 -->
-            <rect x="22" y="14" width="14" height="14" fill="${c.skin}" rx="2"/>
-            <!-- 头发 -->
-            <rect x="20" y="10" width="18" height="6" fill="${c.hair}" rx="2"/>
-            <rect x="20" y="14" width="4" height="4" fill="${c.hair}"/>
-            <rect x="34" y="14" width="4" height="4" fill="${c.hair}"/>
-            <!-- 眼睛（半闭，悠闲） -->
-            <rect x="24" y="20" width="4" height="1" fill="#1a1a2e" rx="1"/>
-            <rect x="30" y="20" width="4" height="1" fill="#1a1a2e" rx="1"/>
-            <!-- 微笑 -->
-            <rect x="26" y="24" width="6" height="2" fill="#e57373" rx="1"/>
-        </svg>`;
-    }
+    return `<svg width="48" height="64" viewBox="0 0 48 64">
+        <!-- 腿 -->
+        <rect x="14" y="44" width="8" height="14" fill="${c.pants}" rx="2"/>
+        <rect x="26" y="44" width="8" height="14" fill="${c.pants}" rx="2"/>
+        <!-- 脚 -->
+        <rect x="12" y="56" width="10" height="4" fill="${c.shoe}" rx="2"/>
+        <rect x="26" y="56" width="10" height="4" fill="${c.shoe}" rx="2"/>
+        <!-- 身体 -->
+        <rect x="12" y="26" width="24" height="20" fill="${c.shirt}" rx="3"/>
+        <!-- 手臂（敲键盘姿势 - 前伸） -->
+        <rect x="2" y="28" width="12" height="6" fill="${c.skin}" rx="2"/>
+        <rect x="34" y="28" width="12" height="6" fill="${c.skin}" rx="2"/>
+        <!-- 手 -->
+        <rect x="0" y="30" width="6" height="5" fill="${c.skin}" rx="2"/>
+        <rect x="42" y="30" width="6" height="5" fill="${c.skin}" rx="2"/>
+        <!-- 头 -->
+        <rect x="14" y="10" width="20" height="18" fill="${c.skin}" rx="3"/>
+        <!-- 头发 -->
+        <rect x="12" y="4" width="24" height="10" fill="${c.hair}" rx="3"/>
+        <rect x="12" y="12" width="4" height="6" fill="${c.hair}"/>
+        <rect x="32" y="12" width="4" height="6" fill="${c.hair}"/>
+        <!-- 眼睛（专注看屏幕） -->
+        <rect x="17" y="16" width="4" height="3" fill="#1a1a2e" rx="1"/>
+        <rect x="26" y="16" width="4" height="3" fill="#1a1a2e" rx="1"/>
+        <!-- 嘴巴（认真） -->
+        <rect x="21" y="22" width="5" height="1" fill="#c0392b" rx="1"/>
+        <!-- 汗珠（忙碌） -->
+        <rect x="38" y="10" width="3" height="4" fill="#85c1e9" rx="1" opacity="0.7"/>
+    </svg>`;
 }
 
-// ===== 状态文字 =====
+// 休息/空闲：离开工位，闲逛摸鱼姿态
+function spriteIdle(agentId) {
+    const colors = {
+        openclaw: { shirt: '#6366f1', pants: '#3730a3', skin: '#fcd5b8', hair: '#5d4037', shoe: '#1e1b4b' },
+        codex:    { shirt: '#06b6d4', pants: '#0e7490', skin: '#fcd5b8', hair: '#1a1a2e', shoe: '#0c4a6e' },
+    };
+    const c = colors[agentId] || colors.openclaw;
+    return `<svg width="48" height="64" viewBox="0 0 48 64">
+        <!-- 腿（悠闲姿态） -->
+        <rect x="16" y="44" width="7" height="14" fill="${c.pants}" rx="2"/>
+        <rect x="26" y="44" width="7" height="14" fill="${c.pants}" rx="2"/>
+        <!-- 脚 -->
+        <rect x="14" y="56" width="9" height="4" fill="${c.shoe}" rx="2"/>
+        <rect x="25" y="56" width="9" height="4" fill="${c.shoe}" rx="2"/>
+        <!-- 身体（微微后仰） -->
+        <rect x="13" y="26" width="22" height="20" fill="${c.shirt}" rx="3"/>
+        <!-- 手臂（叉腰/抱胸悠闲姿态） -->
+        <rect x="4" y="28" width="10" height="6" fill="${c.skin}" rx="2"/>
+        <rect x="34" y="28" width="10" height="6" fill="${c.skin}" rx="2"/>
+        <!-- 手 -->
+        <rect x="2" y="30" width="5" height="5" fill="${c.skin}" rx="2"/>
+        <rect x="41" y="30" width="5" height="5" fill="${c.skin}" rx="2"/>
+        <!-- 头（微微仰起） -->
+        <rect x="14" y="10" width="20" height="18" fill="${c.skin}" rx="3"/>
+        <!-- 头发 -->
+        <rect x="12" y="4" width="24" height="10" fill="${c.hair}" rx="3"/>
+        <rect x="12" y="12" width="4" height="6" fill="${c.hair}"/>
+        <rect x="32" y="12" width="4" height="6" fill="${c.hair}"/>
+        <!-- 眼睛（半闭，悠闲） -->
+        <rect x="17" y="16" width="5" height="2" fill="#1a1a2e" rx="1"/>
+        <rect x="26" y="16" width="5" height="2" fill="#1a1a2e" rx="1"/>
+        <!-- 微笑 -->
+        <rect x="20" y="22" width="7" height="2" fill="#e57373" rx="1"/>
+        <!-- 茶杯（摸鱼道具） -->
+        <rect x="40" y="20" width="8" height="10" fill="#e0e0e0" rx="2"/>
+        <rect x="42" y="22" width="4" height="6" fill="#8d6e63" rx="1"/>
+        <!-- 蒸汽 -->
+        <rect x="43" y="14" width="2" height="4" fill="rgba(255,255,255,0.3)" rx="1"/>
+    </svg>`;
+}
+
+// 离线：躺着睡觉
+function spriteOffline(agentId) {
+    const colors = {
+        openclaw: { shirt: '#6366f1', pants: '#3730a3', skin: '#fcd5b8', hair: '#5d4037', shoe: '#1e1b4b' },
+        codex:    { shirt: '#06b6d4', pants: '#0e7490', skin: '#fcd5b8', hair: '#1a1a2e', shoe: '#0c4a6e' },
+    };
+    const c = colors[agentId] || colors.openclaw;
+    return `<svg width="48" height="64" viewBox="0 0 48 64">
+        <!-- 身体（横躺） -->
+        <rect x="4" y="40" width="40" height="14" fill="${c.shirt}" rx="4" opacity="0.6"/>
+        <!-- 头（侧躺） -->
+        <rect x="0" y="34" width="16" height="14" fill="${c.skin}" rx="3" opacity="0.7"/>
+        <!-- 闭眼 -->
+        <rect x="2" y="40" width="5" height="1" fill="#1a1a2e" rx="1"/>
+        <!-- 腿 -->
+        <rect x="40" y="44" width="8" height="10" fill="${c.pants}" rx="2" opacity="0.5"/>
+        <!-- ZZZ -->
+        <rect x="30" y="24" width="6" height="6" fill="rgba(255,255,255,0.35)" rx="1"/>
+        <rect x="38" y="16" width="5" height="5" fill="rgba(255,255,255,0.25)" rx="1"/>
+        <rect x="44" y="10" width="4" height="4" fill="rgba(255,255,255,0.15)" rx="1"/>
+    </svg>`;
+}
+
+function generateSprite(agentId, status) {
+    if (status === 'online') return spriteWorking(agentId);
+    if (status === 'offline') return spriteOffline(agentId);
+    return spriteIdle(agentId);
+}
+
 function getStatusText(status) {
-    if (status === 'online') return '💻 工作中';
-    if (status === 'offline') return '💤 离线';
-    return '☕ 休息中';
+    if (status === 'online') return '💻 疯狂敲代码';
+    if (status === 'offline') return '💤 离线休眠';
+    return '☕ 摸鱼中';
 }
-
 function getStatusClass(status) {
     if (status === 'online') return 'working';
     if (status === 'offline') return 'offline';
     return 'idle';
 }
 
+// ===== 渲染工位 =====
+function createDeskStation(x, y) {
+    const desk = document.createElement('div');
+    desk.className = 'desk-station';
+    desk.style.left = x + 'px';
+    desk.style.bottom = y + 'px';
+    desk.innerHTML = `
+        <div class="iso-desk">
+            <div class="iso-monitor"></div>
+            <div class="iso-monitor-stand"></div>
+            <div class="iso-desk-top"></div>
+            <div class="iso-keyboard"></div>
+            <div class="iso-desk-front"></div>
+        </div>
+        <div class="iso-chair">
+            <div class="iso-chair-back"></div>
+            <div class="iso-chair-seat"></div>
+        </div>
+    `;
+    return desk;
+}
+
 // ===== 渲染 Agent 角色 =====
 function renderCharacters(agents) {
     const stage = document.getElementById('gameStage');
-    // 移除旧的角色
-    stage.querySelectorAll('.agent-character').forEach(el => el.remove());
+    // 移除旧的角色和工位
+    stage.querySelectorAll('.iso-character, .desk-station').forEach(el => el.remove());
 
     const agentIds = Object.keys(agents);
     const count = agentIds.length;
     if (count === 0) return;
 
-    // 计算位置：均匀分布在舞台上
     const stageWidth = stage.offsetWidth || 800;
-    const spacing = Math.min(160, (stageWidth - 120) / count);
-    const startX = (stageWidth - spacing * (count - 1)) / 2;
+    const stageHeight = stage.offsetHeight || 560;
+
+    // 工位排列在场景下半部分
+    const deskY = 100; // 距底部
+    const deskSpacing = Math.min(200, (stageWidth - 160) / count);
+    const deskStartX = (stageWidth - deskSpacing * (count - 1)) / 2;
 
     agentIds.forEach((agentId, i) => {
         const info = agents[agentId];
         const status = info.status || 'offline';
-        const x = startX + i * spacing;
+        const isWorking = status === 'online';
 
+        // 创建工位
+        const deskX = deskStartX + i * deskSpacing - 60;
+        const desk = createDeskStation(deskX, deskY);
+        stage.appendChild(desk);
+
+        // 创建角色
         const charEl = document.createElement('div');
-        charEl.className = `agent-character ${getStatusClass(status)}`;
-        charEl.style.left = (x - 32) + 'px';
-        charEl.style.zIndex = 10 + i;
+        charEl.className = `iso-character ${getStatusClass(status)}`;
+
+        let charX, charY;
+        if (isWorking) {
+            // 工作中：站在工位旁（桌子右侧）
+            charX = deskX + 70;
+            charY = deskY + 10;
+        } else {
+            // 休息/离线：离开工位，在场景里自由活动
+            // 分布在场景上半部分和中间区域
+            const idlePositions = [
+                { x: stageWidth * 0.15, y: stageHeight * 0.25 },
+                { x: stageWidth * 0.75, y: stageHeight * 0.2 },
+                { x: stageWidth * 0.45, y: stageHeight * 0.15 },
+                { x: stageWidth * 0.85, y: stageHeight * 0.35 },
+                { x: stageWidth * 0.1, y: stageHeight * 0.4 },
+            ];
+            const pos = idlePositions[i % idlePositions.length];
+            charX = pos.x - 24;
+            charY = stageHeight - pos.y - 64;
+        }
+
+        charEl.style.left = charX + 'px';
+        charEl.style.bottom = charY + 'px';
+        charEl.style.zIndex = 10 + Math.floor(charY / 10);
 
         const label = info.name || agentId;
         const cpu = info.cpu_usage != null ? info.cpu_usage.toFixed(1) + '%' : '--';
@@ -559,9 +691,12 @@ function renderCharacters(agents) {
         charEl.innerHTML = `
             <div class="speech-bubble">
                 ${label} · CPU ${cpu} · MEM ${mem}<br>
-                <span style="font-size:10px;opacity:0.7">${model}</span>
+                <span style="font-size:9px;opacity:0.6">${model}</span>
             </div>
-            <div class="pixel-sprite">${generatePixelSprite(agentId, status)}</div>
+            <div class="sprite-container">
+                <div class="sprite-shadow"></div>
+                ${generateSprite(agentId, status)}
+            </div>
             <div class="status-badge ${getStatusClass(status)}">${getStatusText(status)}</div>
             <div class="agent-name">${label}</div>
         `;
@@ -571,7 +706,7 @@ function renderCharacters(agents) {
     });
 }
 
-// ===== 显示角色详情 =====
+// ===== 角色详情面板 =====
 function showCharacterDetail(agentId, info) {
     const panel = document.getElementById('characterPanel');
     const title = document.getElementById('panelTitle');
@@ -636,7 +771,7 @@ function formatUptime(seconds) {
     return m + '分';
 }
 
-// ===== 更新 HUD =====
+// ===== HUD 更新 =====
 function updateHUD(data) {
     const agents = data.agents || {};
     const sys = data.system_info || {};
@@ -664,11 +799,9 @@ async function fetchData() {
 }
 
 // ===== SSE 实时更新 =====
-let sseConnected = false;
 function connectSSE() {
     const evtSource = new EventSource(API_HOST + '/api/events');
     evtSource.onopen = function() {
-        sseConnected = true;
         console.log('✅ 像素工坊 SSE 已连接');
     };
     evtSource.onmessage = function(e) {
@@ -681,7 +814,6 @@ function connectSSE() {
         } catch(err) { console.error('SSE parse error:', err); }
     };
     evtSource.onerror = function() {
-        sseConnected = false;
         console.warn('⚠️ SSE 断开，3秒后重试...');
         evtSource.close();
         setTimeout(connectSSE, 3000);
@@ -694,7 +826,7 @@ connectSSE();
 
 // 点击舞台空白处关闭详情面板
 document.getElementById('gameStage').addEventListener('click', function(e) {
-    if (e.target === this || e.target.classList.contains('pixel-grid') || e.target.classList.contains('pixel-ground')) {
+    if (e.target === this || e.target.classList.contains('iso-ground') || e.target.classList.contains('iso-grid')) {
         document.getElementById('characterPanel').classList.remove('active');
     }
 });
