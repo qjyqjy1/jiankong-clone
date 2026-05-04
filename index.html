@@ -219,15 +219,25 @@
         
         // 智能体 ID → 图标映射（动态）
         function agentIcon(agentId) {
-            const icons = { 'openclaw': 'fa-robot', 'codex': 'fa-code' };
+            const icons = { 'openclaw': 'fa-robot', 'codex': 'fa-code', 'hermes': 'fa-user-md' };
             return icons[agentId] || 'fa-microchip';
         }
 
-        // 动态生成智能体卡片
+        // 动态生成智能体卡片（确保每个 agent 卡片存在）
         function renderAgentCards(agents) {
             const container = document.getElementById('agent-cards-container');
             if (!container) return;
-            if (container.children.length === 0) {
+            // 检查每个 agent 卡片是否存在，缺少就追加
+            let needsRender = container.children.length === 0;
+            for (const agentId of Object.keys(agents || {})) {
+                if (!document.querySelector(`.agent-card[data-agent="${agentId}"]`)) {
+                    needsRender = true;
+                    break;
+                }
+            }
+            if (needsRender) {
+                // 清空并重新生成（确保顺序一致）
+                container.innerHTML = '';
                 let html = '';
                 for (const [agentId, info] of Object.entries(agents || {})) {
                     const label = info.name || agentId;
