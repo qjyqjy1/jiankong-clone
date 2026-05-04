@@ -67,13 +67,21 @@ AGENT_DISCOVERY: dict[str, dict[str, Any]] = {
         "config_path": Path("/root/.codex/config.toml"),
         "icon": "🤖",
     },
+    "hermes": {
+        "label": "Hermes",
+        "process_patterns": ["hermes", "hermes-agent"],
+        "systemd_service": None,
+        "listen_ports": [],
+        "config_path": Path("/root/.hermes/config.yaml"),
+        "icon": "⚕️",
+    },
 }
 
 # Dynamic skill directory scanning (only existing directories are scanned)
 SKILL_SCAN_DIRS = [
     (Path("/root/.openclaw/workspace/skills"), "openclaw"),
     (Path("/root/.codex/skills"), "codex"),
-
+    (Path("/root/.hermes/skills"), "hermes"),
 ]
 
 # Agent-specific extra paths (sessions, logs, etc.)
