@@ -13,6 +13,7 @@ import secrets
 import sqlite3
 import subprocess
 import time
+import yaml
 try:
     import tomllib
 except ImportError:
@@ -520,6 +521,8 @@ def _read_agent_config(agent_id: str) -> dict[str, Any]:
         return _read_codex_config(config_path)
     if agent_id == "openclaw":
         return _read_openclaw_config(config_path)
+    if agent_id == "hermes":
+        return _read_hermes_config(config_path)
 
     return {"model": "", "provider": "", "base_url": "", "api_key": "", "providers": []}
 
@@ -568,6 +571,54 @@ def _read_codex_config(config_path: Path) -> dict[str, Any]:
             })
 
     result.update({"model": model, "provider": provider, "base_url": base_url, "api_key": api_key, "providers": providers})
+    return result
+
+
+def _read_hermes_config(config_path: Path) -> dict[str, Any]:
+    """Read Hermes config.yaml + .env."""
+    result = {"model": "", "provider": "", "base_url": "", "api_key": "", "providers": []}
+    if not config_path.exists():
+        return result
+    try:
+        raw = _safe_text(config_path)
+        config = yaml.safe_load(raw) if raw else {}
+        if not isinstance(config, dict):
+            config = {}
+    except Exception:
+        config = {}
+
+    # Hermes config.yaml is flat (OPENAI_BASE_URL at top level)
+    result["model"] = str(config.get("model", "") or "").strip()
+    result["provider"] = str(config.get("provider", "") or "").strip()
+    # Also check flat keys
+    if not result["base_url"] and config.get("OPENAI_BASE_URL"):
+        result["base_url"] = str(config["OPENAI_BASE_URL"]).strip()
+
+    # Read .env for API key and base URL
+    env_path = config_path.parent / ".env"
+    if env_path.exists():
+        env_text = _safe_text(env_path)
+        for line in env_text.splitlines():
+            line = line.strip()
+            if "=" in line and not line.startswith("#"):
+                k, _, v = line.partition("=")
+                k = k.strip(); v = v.strip()
+                if k == "OPENAI_API_KEY":
+                    result["api_key"] = v
+                elif k == "OPENAI_BASE_URL":
+                    result["base_url"] = v
+
+    # Build providers list from config
+    providers_cfg = config.get("providers", {})
+    if isinstance(providers_cfg, dict):
+        for pname, pcfg in providers_cfg.items():
+            if isinstance(pcfg, dict):
+                result["providers"].append({
+                    "name": pname,
+                    "base_url": str(pcfg.get("baseUrl", pcfg.get("base_url", "")) or "").strip(),
+                    "model": str((pcfg.get("models", [{}]) or [{}])[0].get("id", "") or "").strip(),
+                })
+
     return result
 
 
@@ -1371,6 +1422,8 @@ def _update_agent_config(agent_id: str, updates: dict[str, Any]) -> dict[str, An
         return _update_codex_config(config_path, updates)
     elif agent_id == "openclaw":
         return _update_openclaw_config(config_path, updates)
+    elif agent_id == "hermes":
+        return _update_hermes_config(config_path, updates)
     else:
         return {"success": False, "error": f"不支持的智能体类型: {agent_id}"}
 
@@ -1431,6 +1484,57 @@ def _update_codex_config(config_path: Path, updates: dict[str, Any]) -> dict[str
 
     config_path.write_text(toml_str, encoding="utf-8")
     return {"success": True, "message": f"Codex 配置已更新: {config_path}"}
+
+
+def _update_hermes_config(config_path: Path, updates: dict[str, Any]) -> dict[str, Any]:
+    """Update Hermes config.yaml + .env."""
+    import shutil
+
+    # Read existing YAML config
+    raw = _safe_text(config_path) if config_path.exists() else ""
+    try:
+        config = yaml.safe_load(raw) if raw else {}
+    except Exception:
+        config = {}
+    if not isinstance(config, dict):
+        config = {}
+
+    # Read .env file (same directory as config.yaml)
+    env_path = config_path.parent / ".env"
+    env_lines = {}
+    if env_path.exists():
+        for line in _safe_text(env_path).splitlines():
+            line = line.strip()
+            if "=" in line and not line.startswith("#"):
+                k, _, v = line.partition("=")
+                env_lines[k.strip()] = v.strip()
+
+    # Apply updates to YAML config
+    if "model" in updates:
+        config["model"] = updates["model"]
+    if "provider" in updates:
+        config["provider"] = updates["provider"]
+
+    # Apply updates to .env (API key, base URL)
+    if "api_key" in updates:
+        env_lines["OPENAI_API_KEY"] = updates["api_key"]
+    if "base_url" in updates:
+        env_lines["OPENAI_BASE_URL"] = updates["base_url"]
+
+    # Write YAML
+    if config_path.exists():
+        shutil.copy2(str(config_path), str(config_path) + ".bak")
+    with open(config_path, "w") as f:
+        yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
+
+    # Write .env
+    if env_path.exists():
+        shutil.copy2(str(env_path), str(env_path) + ".bak")
+    with open(env_path, "w") as f:
+        for k, v in env_lines.items():
+            f.write(f"{k}={v}\n")
+
+    return {"success": True, "message": "Hermes 配置已更新"}
 
 
 def _update_openclaw_config(config_path: Path, updates: dict[str, Any]) -> dict[str, Any]:

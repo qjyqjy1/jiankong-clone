@@ -720,23 +720,21 @@
         }
         async function switchAgentModel(agent, modelId) {
             addLog('info', `正在切换 ${agent} 模型到 ${modelId}...`);
-            const aliases = [agent];
-            let lastError = '未知错误';
-            for (const alias of aliases) {
-                try {
-                    const response = await fetch(API_HOST + '/api/switch_model?agent=' + encodeURIComponent(alias) + '&model_id=' + encodeURIComponent(modelId));
-                    const result = await response.json();
-                    if (result.status === 'success') {
-                        addLog('success', `✅ ${result.message}`);
-                        setTimeout(refreshData, 1000);
-                        return;
-                    }
-                    lastError = result.error || result.message || `HTTP ${response.status}`;
-                } catch (err) {
-                    lastError = err.message;
+            try {
+                const response = await fetch(API_HOST + '/api/agent_config/update', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({agent_id: agent, model: modelId})
+                });
+                const result = await response.json();
+                if (result.success) {
+                    addLog('success', `✅ ${result.message || '切换成功'}`);
+                } else {
+                    addLog('error', `❌ 切换失败: ${result.error || '未知错误'}`);
                 }
+            } catch (err) {
+                addLog('error', `❌ 切换失败: ${err.message}`);
             }
-            addLog('error', `❌ 切换失败: ${lastError}`);
             setTimeout(refreshData, 1000);
         }
         function switchModel(id) { addLog('info', '切换模型: ' + id); }
