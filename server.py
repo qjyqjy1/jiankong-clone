@@ -1307,9 +1307,13 @@ def _fallback_status() -> dict[str, Any]:
         agent_model = str((local_models.get("agent_models") or {}).get(agent_id) or "unknown")
         agent_call_stats = call_stats.get("by_source", {}).get(agent_id, {})
 
+        # For CLI-based agents like Hermes (no daemon), check config existence
+        _is_cli_agent = agent_id in ("hermes",)
+        _agent_cfg = AGENT_DISCOVERY.get(agent_id, {})
+        _agent_online = proc["running"] or (_is_cli_agent and _agent_cfg.get("config_path") and Path(_agent_cfg["config_path"]).exists())
         agents_status[agent_id] = {
             "name": agent_info["label"],
-            "status": "online" if proc["running"] else "stopped",
+            "status": "online" if _agent_online else "stopped",
             "cpu_usage": round(proc["cpu_usage"], 1),
             "memory_usage": round(proc["memory_usage"], 1),
             "disk_usage": 0,
