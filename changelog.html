@@ -4,217 +4,702 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
-    <title>更新日志 · 小猪智能体面板</title>
+    <title>像素工坊 · 小猪智能体面板</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="theme.css?v=20260429">
-    <link rel="stylesheet" href="navbar.css?v=20260429?v=20260428">
+    <link rel="stylesheet" href="navbar.css?v=20260429">
     <style>
-        
-        
-        
-        
-        
-        
-                                .timeline { position: relative; padding-left: 24px; }
-        .timeline::before {
-            content: '';
-            position: absolute;
-            left: 7px;
-            top: 0;
-            bottom: 0;
-            width: 2px;
-            background: linear-gradient(to bottom, var(--accent-1), var(--accent-2), var(--accent-3), transparent);
-        }
-        .version-entry {
-            margin-bottom: 16px;
+        /* ===== 像素风游戏界面 ===== */
+        .pixel-font { font-family: 'Press Start 2P', monospace; }
+
+        .game-stage {
             position: relative;
-            animation: fadeInUp 0.4s ease forwards;
+            width: 100%;
+            min-height: 520px;
+            background: linear-gradient(180deg, #1a1c2e 0%, #16182a 40%, #1e2030 60%, #252838 100%);
+            border: 2px solid rgba(255,255,255,0.08);
+            border-radius: 14px;
+            overflow: hidden;
+            margin-bottom: 20px;
+            image-rendering: pixelated;
         }
-        .version-entry::before {
+
+        /* 像素网格背景 */
+        .pixel-grid {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-image:
+                linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+            background-size: 16px 16px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* 地面 */
+        .pixel-ground {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 80px;
+            background: linear-gradient(0deg, #2a2d3e 0%, #232635 60%, transparent 100%);
+            border-top: 2px solid rgba(99,102,241,0.2);
+            z-index: 1;
+        }
+        .pixel-ground::before {
             content: '';
             position: absolute;
-            left: -21px;
-            top: 5px;
-            width: 10px;
-            height: 10px;
-            background: var(--bg-primary);
-            border: 2px solid var(--accent-1);
-            border-radius: 50%;
-            box-shadow: 0 0 8px var(--glow-1);
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: repeating-linear-gradient(90deg,
+                rgba(99,102,241,0.3) 0px,
+                rgba(99,102,241,0.3) 8px,
+                transparent 8px,
+                transparent 16px
+            );
         }
-        .version-entry:nth-child(2)::before { border-color: var(--accent-2); box-shadow: 0 0 8px var(--glow-2); }
-        .version-entry:nth-child(3)::before { border-color: var(--accent-3); }
-        .version-entry:nth-child(4)::before { border-color: var(--accent-4); }
-        .version-header {
+
+        /* 装饰性建筑/树 */
+        .pixel-decoration {
+            position: absolute;
+            bottom: 78px;
+            z-index: 2;
+            opacity: 0.6;
+        }
+
+        /* Agent 像素角色容器 */
+        .agent-character {
+            position: absolute;
+            bottom: 78px;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+        .agent-character:hover {
+            transform: translateY(-8px);
+        }
+
+        /* 像素角色 */
+        .pixel-sprite {
+            width: 64px;
+            height: 64px;
+            position: relative;
+            image-rendering: pixelated;
+        }
+
+        /* 角色状态指示器 */
+        .status-badge {
+            margin-top: 6px;
+            padding: 3px 10px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+            border: 1px solid transparent;
+        }
+        .status-badge.working {
+            background: rgba(16,185,129,0.15);
+            color: #10b981;
+            border-color: rgba(16,185,129,0.3);
+            animation: badgePulse 2s ease-in-out infinite;
+        }
+        .status-badge.idle {
+            background: rgba(245,158,11,0.15);
+            color: #f59e0b;
+            border-color: rgba(245,158,11,0.3);
+        }
+        .status-badge.offline {
+            background: rgba(239,68,68,0.15);
+            color: #ef4444;
+            border-color: rgba(239,68,68,0.3);
+        }
+        @keyframes badgePulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        /* 角色名字 */
+        .agent-name {
+            margin-top: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        /* 对话气泡 */
+        .speech-bubble {
+            position: absolute;
+            top: -40px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255,255,255,0.95);
+            color: #1a1a2e;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 600;
+            white-space: nowrap;
+            opacity: 0;
+            transition: opacity 0.3s ease, top 0.3s ease;
+            pointer-events: none;
+            z-index: 20;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -6px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-left: 6px solid transparent;
+            border-right: 6px solid transparent;
+            border-top: 6px solid rgba(255,255,255,0.95);
+        }
+        .agent-character:hover .speech-bubble {
+            opacity: 1;
+            top: -48px;
+        }
+
+        /* 工作中的动画 - 角色轻微上下跳动 */
+        @keyframes workingBounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-4px); }
+        }
+        .agent-character.working .pixel-sprite {
+            animation: workingBounce 0.8s ease-in-out infinite;
+        }
+
+        /* 偷懒动画 - 角色左右摇晃 */
+        @keyframes idleWobble {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-3deg); }
+            75% { transform: rotate(3deg); }
+        }
+        .agent-character.idle .pixel-sprite {
+            animation: idleWobble 3s ease-in-out infinite;
+        }
+
+        /* 离线动画 - 角色变灰 */
+        .agent-character.offline .pixel-sprite {
+            filter: grayscale(0.8) brightness(0.6);
+        }
+
+        /* 像素角色 SVG 样式 */
+        .sprite-body { fill: currentColor; }
+        .sprite-outline { fill: none; stroke: rgba(0,0,0,0.3); stroke-width: 2; }
+
+        /* 状态栏 HUD */
+        .hud-bar {
             display: flex;
             align-items: center;
-            gap: 10px;
-            margin-bottom: 8px;
-        }
-        .version-number {
-            background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
-            color: white;
-            padding: 2px 10px;
-            border-radius: 12px;
-            font-size: 13px;
-            font-weight: 700;
-            box-shadow: 0 2px 8px var(--glow-1);
-        }
-        .version-date { color: var(--text-muted); font-size: 13px; font-weight: 500; }
-        .version-card {
-            background: var(--bg-card);
-            backdrop-filter: blur(12px);
-            border: 1px solid var(--border);
+            justify-content: space-between;
+            padding: 12px 20px;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.06);
             border-radius: 10px;
-            padding: 14px 16px;
-            transition: all 0.3s ease;
+            margin-bottom: 16px;
         }
-        .version-card:hover { border-color: var(--border-glow); }
-        .changelog-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
-        .changelog-item {
-            display: flex;
-            align-items: flex-start;
-            gap: 8px;
-            padding: 6px 10px;
-            background: rgba(255,255,255,0.02);
+        .hud-left { display: flex; align-items: center; gap: 16px; }
+        .hud-right { display: flex; align-items: center; gap: 12px; }
+        .hud-stat { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-secondary); }
+        .hud-stat i { font-size: 14px; }
+        .hud-stat .value { font-weight: 700; color: var(--text-primary); }
+        .hud-divider { width: 1px; height: 20px; background: rgba(255,255,255,0.08); }
+
+        /* 像素风按钮 */
+        .btn-pixel {
+            padding: 8px 16px;
+            border: 2px solid;
             border-radius: 6px;
-            font-size: 14px;
-            color: var(--text-secondary);
-        }
-        [data-theme="light"] .changelog-item { background: rgba(0,0,0,0.02); }
-        .changelog-item::before {
-            content: '';
-            width: 5px;
-            height: 5px;
-            border-radius: 50%;
-            background: var(--accent-1);
-            margin-top: 5px;
-            flex-shrink: 0;
-        }
-        .version-type {
-            display: inline-block;
-            padding: 1px 6px;
-            border-radius: 4px;
             font-size: 12px;
             font-weight: 700;
-            margin-right: 6px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            position: relative;
+            image-rendering: pixelated;
         }
-        .version-type.feature { background: rgba(16,185,129,0.15); color: var(--accent-4); }
-        .version-type.fix { background: rgba(99,102,241,0.15); color: var(--accent-1); }
-        .version-type.ui { background: rgba(245,158,11,0.15); color: var(--accent-5); }
-        .version-type.enhancement { background: rgba(139,92,246,0.15); color: var(--accent-2); }
-        .version-type.note { background: rgba(6,182,212,0.15); color: var(--accent-3); }
-        .version-type.perf { background: rgba(239,68,68,0.15); color: var(--accent-6); }
-        .version-type.refactor { background: rgba(139,92,246,0.15); color: var(--accent-2); }
-        @keyframes fadeInUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-        
+        .btn-pixel:active {
+            transform: translateY(2px);
+        }
+        .btn-pixel-primary {
+            background: var(--accent-1);
+            border-color: #4f46e5;
+            color: white;
+        }
+        .btn-pixel-primary:hover {
+            background: #4f46e5;
+            box-shadow: 0 0 12px rgba(99,102,241,0.4);
+        }
+        .btn-pixel-ghost {
+            background: transparent;
+            border-color: rgba(255,255,255,0.15);
+            color: var(--text-secondary);
+        }
+        .btn-pixel-ghost:hover {
+            border-color: rgba(255,255,255,0.3);
+            color: var(--text-primary);
+        }
+
+        /* 角色详情面板 */
+        .character-panel {
+            display: none;
+            background: rgba(0,0,0,0.25);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 16px;
+            animation: panelSlide 0.3s ease;
+        }
+        .character-panel.active { display: block; }
+        @keyframes panelSlide {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .character-panel h3 {
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .character-panel h3 i { color: var(--accent-1); }
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+        }
+        .stat-item {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 8px;
+            padding: 12px;
+        }
+        .stat-item .label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+        .stat-item .value { font-size: 18px; font-weight: 800; }
+
+        /* 迷你像素图标 */
+        .mini-icon {
+            width: 24px;
+            height: 24px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .mini-icon.green { background: rgba(16,185,129,0.15); color: #10b981; }
+        .mini-icon.blue { background: rgba(99,102,241,0.15); color: var(--accent-1); }
+        .mini-icon.cyan { background: rgba(6,182,212,0.15); color: #06b6d4; }
+        .mini-icon.yellow { background: rgba(245,158,11,0.15); color: #f59e0b; }
+        .mini-icon.red { background: rgba(239,68,68,0.15); color: #ef4444; }
+
+        /* 响应式 */
         @media (max-width: 768px) {
-                            .timeline { padding-left: 20px; }
+            .pixel-sprite { width: 48px; height: 48px; }
+            .hud-bar { flex-direction: column; gap: 10px; }
+            .hud-left, .hud-right { flex-wrap: wrap; justify-content: center; }
         }
-        @media (max-width: 480px) {
-                            .version-card { padding: 10px; }
-            .version-number { font-size: 10px; padding: 2px 8px; }
-            .changelog-item { font-size: 12px; padding: 5px 8px; }
-            .timeline { padding-left: 16px; }
-            .timeline::before { left: 5px; }
-            .version-entry::before { left: -17px; width: 8px; height: 8px; }
-        }
-        
-        
-        
-    
-        [data-theme="light"] .changelog-item { background: rgba(0,0,0,0.02); }
-        [data-theme="light"] .version-card { background: rgba(255,255,255,0.9); border-color: rgba(0,0,0,0.08); }
-        [data-theme="light"] .version-header { border-color: rgba(0,0,0,0.06); }
-        [data-theme="light"] .version-number { color: white; background: linear-gradient(135deg, #3730a3, #6d28d9); }
-        [data-theme="light"] .version-date { color: var(--text-muted); }
-        [data-theme="light"] .timeline::before { background: rgba(0,0,0,0.1); }
-</style>
+    </style>
 </head>
 <body>
-    
-    
 
-    <div class="main-container">
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-value" id="stat-total-versions">--</div>
-                <div class="stat-label"><i class="fas fa-code-branch"></i> 总版本数</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="stat-total-changes">--</div>
-                <div class="stat-label"><i class="fas fa-star"></i> 功能更新</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="stat-ui-changes">--</div>
-                <div class="stat-label"><i class="fas fa-paint-brush"></i> 界面优化</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="stat-fix-changes">--</div>
-                <div class="stat-label"><i class="fas fa-wrench"></i> 问题修复</div>
-            </div>
+<div id="navbar-container"></div>
+
+<div class="main-container">
+    <!-- HUD 状态栏 -->
+    <div class="hud-bar">
+        <div class="hud-left">
+            <div class="hud-stat"><i class="fas fa-microchip" style="color:var(--accent-1)"></i> 智能体: <span class="value" id="hud-agents">0</span></div>
+            <div class="hud-divider"></div>
+            <div class="hud-stat"><i class="fas fa-bolt" style="color:#10b981"></i> 工作中: <span class="value" id="hud-working">0</span></div>
+            <div class="hud-divider"></div>
+            <div class="hud-stat"><i class="fas fa-coffee" style="color:#f59e0b"></i> 休息中: <span class="value" id="hud-idle">0</span></div>
         </div>
-        <div class="timeline" id="timeline"></div>
+        <div class="hud-right">
+            <div class="hud-stat"><i class="fas fa-tachometer-alt" style="color:var(--accent-3)"></i> CPU: <span class="value" id="hud-cpu">--</span></div>
+            <div class="hud-divider"></div>
+            <div class="hud-stat"><i class="fas fa-memory" style="color:var(--accent-2)"></i> MEM: <span class="value" id="hud-mem">--</span></div>
+            <div class="hud-divider"></div>
+            <div class="hud-stat"><i class="fas fa-clock" style="color:var(--text-muted)"></i> <span id="hud-uptime">--</span></div>
+        </div>
     </div>
 
-    <script>    const API_HOST = window.location.origin;
-    const TYPE_LABELS = {
-        '新功能': 'feature', '修复': 'fix',
-        '界面': 'ui', '优化': 'enhancement',
-        '重构': 'refactor', '性能': 'perf'
+    <!-- 游戏舞台 -->
+    <div class="game-stage" id="gameStage">
+        <div class="pixel-grid"></div>
+
+        <!-- 装饰：左侧树 -->
+        <div class="pixel-decoration" style="left:60px;">
+            <svg width="48" height="64" viewBox="0 0 48 64">
+                <rect x="20" y="40" width="8" height="24" fill="#5d4037" rx="1"/>
+                <rect x="8" y="20" width="32" height="24" fill="#2e7d32" rx="2"/>
+                <rect x="14" y="8" width="20" height="18" fill="#388e3c" rx="2"/>
+                <rect x="18" y="0" width="12" height="12" fill="#43a047" rx="2"/>
+            </svg>
+        </div>
+
+        <!-- 装饰：右侧建筑 -->
+        <div class="pixel-decoration" style="right:80px;">
+            <svg width="56" height="80" viewBox="0 0 56 80">
+                <rect x="8" y="24" width="40" height="56" fill="#37474f" rx="1"/>
+                <rect x="0" y="40" width="56" height="40" fill="#455a64" rx="1"/>
+                <rect x="14" y="30" width="8" height="8" fill="#fff9c4" rx="1" opacity="0.8"/>
+                <rect x="30" y="30" width="8" height="8" fill="#fff9c4" rx="1" opacity="0.6"/>
+                <rect x="14" y="46" width="8" height="8" fill="#fff9c4" rx="1" opacity="0.4"/>
+                <rect x="30" y="46" width="8" height="8" fill="#fff9c4" rx="1" opacity="0.7"/>
+                <rect x="22" y="60" width="12" height="20" fill="#5d4037" rx="1"/>
+            </svg>
+        </div>
+
+        <!-- 装饰：云朵 -->
+        <div class="pixel-decoration" style="top:20px;left:25%;">
+            <svg width="64" height="28" viewBox="0 0 64 28">
+                <rect x="12" y="8" width="40" height="12" fill="rgba(255,255,255,0.06)" rx="3"/>
+                <rect x="20" y="4" width="24" height="10" fill="rgba(255,255,255,0.08)" rx="3"/>
+                <rect x="8" y="12" width="16" height="8" fill="rgba(255,255,255,0.05)" rx="2"/>
+            </svg>
+        </div>
+        <div class="pixel-decoration" style="top:36px;right:20%;">
+            <svg width="48" height="22" viewBox="0 0 48 22">
+                <rect x="8" y="6" width="32" height="10" fill="rgba(255,255,255,0.05)" rx="3"/>
+                <rect x="14" y="2" width="20" height="8" fill="rgba(255,255,255,0.07)" rx="2"/>
+            </svg>
+        </div>
+
+        <!-- 装饰：小草 -->
+        <div class="pixel-decoration" style="left:200px;bottom:78px;">
+            <svg width="32" height="16" viewBox="0 0 32 16">
+                <rect x="4" y="8" width="3" height="8" fill="#2e7d32" rx="1"/>
+                <rect x="10" y="4" width="3" height="12" fill="#388e3c" rx="1"/>
+                <rect x="16" y="6" width="3" height="10" fill="#2e7d32" rx="1"/>
+                <rect x="22" y="3" width="3" height="13" fill="#43a047" rx="1"/>
+                <rect x="27" y="7" width="3" height="9" fill="#2e7d32" rx="1"/>
+            </svg>
+        </div>
+
+        <!-- Agent 角色将由 JS 动态生成 -->
+        <div class="pixel-ground"></div>
+    </div>
+
+    <!-- 角色详情面板 -->
+    <div class="character-panel" id="characterPanel">
+        <h3><i class="fas fa-info-circle"></i> <span id="panelTitle">Agent 详情</span></h3>
+        <div class="stat-grid" id="panelStats"></div>
+    </div>
+
+    <!-- 底部信息 -->
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;color:var(--text-muted);font-size:12px;">
+        <span><i class="fas fa-gamepad"></i> 像素工坊 v1.0 — 点击角色查看详情</span>
+        <span id="lastUpdate">--</span>
+    </div>
+</div>
+
+<script>
+const API_HOST = window.location.origin;
+
+// ===== 像素角色 SVG 生成 =====
+function generatePixelSprite(agentId, status) {
+    const colors = {
+        openclaw: { primary: '#6366f1', secondary: '#818cf8', accent: '#4f46e5', skin: '#fcd5b8', hair: '#5d4037' },
+        codex:    { primary: '#06b6d4', secondary: '#22d3ee', accent: '#0891b2', skin: '#fcd5b8', hair: '#1a1a2e' },
     };
-    function esc(s) {
-        const d = document.createElement('div');
-        d.textContent = s || '';
-        return d.innerHTML;
-    }
+    const c = colors[agentId] || colors.openclaw;
 
-    // 从 API 加载更新日志
-    async function loadChangelog() {
+    // 根据状态选择姿态
+    if (status === 'online') {
+        // 工作姿态：坐着敲电脑
+        return `<svg width="64" height="64" viewBox="0 0 64 64">
+            <!-- 椅子 -->
+            <rect x="16" y="44" width="24" height="4" fill="#5d4037" rx="1"/>
+            <rect x="18" y="48" width="4" height="12" fill="#5d4037"/>
+            <rect x="34" y="48" width="4" height="12" fill="#5d4037"/>
+            <rect x="14" y="34" width="4" height="12" fill="#5d4037"/>
+            <rect x="14" y="34" width="24" height="4" fill="#5d4037" rx="1"/>
+            <!-- 桌子 -->
+            <rect x="4" y="36" width="40" height="4" fill="#8d6e63" rx="1"/>
+            <!-- 腿 -->
+            <rect x="20" y="40" width="4" height="6" fill="${c.accent}"/>
+            <rect x="32" y="40" width="4" height="6" fill="${c.accent}"/>
+            <!-- 身体 -->
+            <rect x="18" y="26" width="20" height="16" fill="${c.primary}" rx="2"/>
+            <!-- 手臂（敲键盘姿势） -->
+            <rect x="10" y="28" width="8" height="4" fill="${c.skin}" rx="1"/>
+            <rect x="38" y="28" width="8" height="4" fill="${c.skin}" rx="1"/>
+            <!-- 键盘 -->
+            <rect x="10" y="38" width="28" height="3" fill="#455a64" rx="1"/>
+            <rect x="12" y="38" width="3" height="3" fill="#607d8b" rx="1"/>
+            <rect x="17" y="38" width="3" height="3" fill="#607d8b" rx="1"/>
+            <rect x="22" y="38" width="3" height="3" fill="#607d8b" rx="1"/>
+            <rect x="27" y="38" width="3" height="3" fill="#607d8b" rx="1"/>
+            <rect x="32" y="38" width="3" height="3" fill="#607d8b" rx="1"/>
+            <!-- 头 -->
+            <rect x="20" y="14" width="16" height="14" fill="${c.skin}" rx="2"/>
+            <!-- 头发 -->
+            <rect x="18" y="10" width="20" height="6" fill="${c.hair}" rx="2"/>
+            <rect x="18" y="14" width="4" height="4" fill="${c.hair}"/>
+            <rect x="34" y="14" width="4" height="4" fill="${c.hair}"/>
+            <!-- 眼睛（专注） -->
+            <rect x="23" y="20" width="3" height="2" fill="#1a1a2e" rx="1"/>
+            <rect x="30" y="20" width="3" height="2" fill="#1a1a2e" rx="1"/>
+            <!-- 嘴巴（认真） -->
+            <rect x="26" y="24" width="4" height="1" fill="#e57373" rx="1"/>
+            <!-- 显示器 -->
+            <rect x="44" y="18" width="16" height="12" fill="#37474f" rx="1"/>
+            <rect x="46" y="20" width="12" height="8" fill="${c.secondary}" rx="1" opacity="0.3"/>
+            <rect x="50" y="30" width="4" height="4" fill="#5d4037"/>
+        </svg>`;
+    } else if (status === 'offline') {
+        // 离线姿态：躺着
+        return `<svg width="64" height="64" viewBox="0 0 64 64">
+            <!-- 身体（横躺） -->
+            <rect x="8" y="38" width="32" height="12" fill="${c.primary}" rx="3" opacity="0.6"/>
+            <!-- 头 -->
+            <rect x="4" y="34" width="14" height="12" fill="${c.skin}" rx="2" opacity="0.7"/>
+            <!-- 闭眼 -->
+            <rect x="6" y="40" width="4" height="1" fill="#1a1a2e" rx="1"/>
+            <!-- ZZZ -->
+            <rect x="42" y="26" width="6" height="6" fill="rgba(255,255,255,0.4)" rx="1"/>
+            <rect x="50" y="18" width="5" height="5" fill="rgba(255,255,255,0.3)" rx="1"/>
+            <rect x="56" y="12" width="4" height="4" fill="rgba(255,255,255,0.2)" rx="1"/>
+            <!-- 腿 -->
+            <rect x="36" y="42" width="8" height="6" fill="${c.accent}" rx="2" opacity="0.5"/>
+        </svg>`;
+    } else {
+        // 偷懒/休息姿态：坐着喝茶
+        return `<svg width="64" height="64" viewBox="0 0 64 64">
+            <!-- 椅子 -->
+            <rect x="18" y="44" width="20" height="4" fill="#5d4037" rx="1"/>
+            <rect x="20" y="48" width="4" height="12" fill="#5d4037"/>
+            <rect x="32" y="48" width="4" height="12" fill="#5d4037"/>
+            <rect x="14" y="34" width="4" height="12" fill="#5d4037"/>
+            <rect x="14" y="34" width="22" height="4" fill="#5d4037" rx="1"/>
+            <!-- 腿 -->
+            <rect x="22" y="40" width="4" height="6" fill="${c.accent}"/>
+            <rect x="30" y="40" width="4" height="6" fill="${c.accent}"/>
+            <!-- 身体 -->
+            <rect x="20" y="26" width="16" height="16" fill="${c.primary}" rx="2"/>
+            <!-- 手臂（托茶杯） -->
+            <rect x="12" y="30" width="8" height="4" fill="${c.skin}" rx="1"/>
+            <rect x="36" y="28" width="8" height="4" fill="${c.skin}" rx="1"/>
+            <!-- 茶杯 -->
+            <rect x="42" y="24" width="10" height="8" fill="#e0e0e0" rx="2"/>
+            <rect x="44" y="26" width="6" height="4" fill="#8d6e63" rx="1"/>
+            <!-- 蒸汽 -->
+            <rect x="46" y="18" width="2" height="4" fill="rgba(255,255,255,0.3)" rx="1"/>
+            <rect x="49" y="20" width="2" height="3" fill="rgba(255,255,255,0.2)" rx="1"/>
+            <!-- 头 -->
+            <rect x="22" y="14" width="14" height="14" fill="${c.skin}" rx="2"/>
+            <!-- 头发 -->
+            <rect x="20" y="10" width="18" height="6" fill="${c.hair}" rx="2"/>
+            <rect x="20" y="14" width="4" height="4" fill="${c.hair}"/>
+            <rect x="34" y="14" width="4" height="4" fill="${c.hair}"/>
+            <!-- 眼睛（半闭，悠闲） -->
+            <rect x="24" y="20" width="4" height="1" fill="#1a1a2e" rx="1"/>
+            <rect x="30" y="20" width="4" height="1" fill="#1a1a2e" rx="1"/>
+            <!-- 微笑 -->
+            <rect x="26" y="24" width="6" height="2" fill="#e57373" rx="1"/>
+        </svg>`;
+    }
+}
+
+// ===== 状态文字 =====
+function getStatusText(status) {
+    if (status === 'online') return '💻 工作中';
+    if (status === 'offline') return '💤 离线';
+    return '☕ 休息中';
+}
+
+function getStatusClass(status) {
+    if (status === 'online') return 'working';
+    if (status === 'offline') return 'offline';
+    return 'idle';
+}
+
+// ===== 渲染 Agent 角色 =====
+function renderCharacters(agents) {
+    const stage = document.getElementById('gameStage');
+    // 移除旧的角色
+    stage.querySelectorAll('.agent-character').forEach(el => el.remove());
+
+    const agentIds = Object.keys(agents);
+    const count = agentIds.length;
+    if (count === 0) return;
+
+    // 计算位置：均匀分布在舞台上
+    const stageWidth = stage.offsetWidth || 800;
+    const spacing = Math.min(160, (stageWidth - 120) / count);
+    const startX = (stageWidth - spacing * (count - 1)) / 2;
+
+    agentIds.forEach((agentId, i) => {
+        const info = agents[agentId];
+        const status = info.status || 'offline';
+        const x = startX + i * spacing;
+
+        const charEl = document.createElement('div');
+        charEl.className = `agent-character ${getStatusClass(status)}`;
+        charEl.style.left = (x - 32) + 'px';
+        charEl.style.zIndex = 10 + i;
+
+        const label = info.name || agentId;
+        const cpu = info.cpu_usage != null ? info.cpu_usage.toFixed(1) + '%' : '--';
+        const mem = info.memory_usage != null ? info.memory_usage.toFixed(1) + '%' : '--';
+        const model = info.model || '--';
+
+        charEl.innerHTML = `
+            <div class="speech-bubble">
+                ${label} · CPU ${cpu} · MEM ${mem}<br>
+                <span style="font-size:10px;opacity:0.7">${model}</span>
+            </div>
+            <div class="pixel-sprite">${generatePixelSprite(agentId, status)}</div>
+            <div class="status-badge ${getStatusClass(status)}">${getStatusText(status)}</div>
+            <div class="agent-name">${label}</div>
+        `;
+
+        charEl.addEventListener('click', () => showCharacterDetail(agentId, info));
+        stage.appendChild(charEl);
+    });
+}
+
+// ===== 显示角色详情 =====
+function showCharacterDetail(agentId, info) {
+    const panel = document.getElementById('characterPanel');
+    const title = document.getElementById('panelTitle');
+    const stats = document.getElementById('panelStats');
+
+    const status = info.status || 'offline';
+    const statusIcon = status === 'online' ? '🟢' : status === 'offline' ? '🔴' : '🟡';
+    title.textContent = `${statusIcon} ${info.name || agentId} 详情`;
+
+    stats.innerHTML = `
+        <div class="stat-item">
+            <div class="label"><span class="mini-icon ${status === 'online' ? 'green' : status === 'offline' ? 'red' : 'yellow'}"><i class="fas fa-circle"></i></span> 状态</div>
+            <div class="value" style="color:${status === 'online' ? '#10b981' : status === 'offline' ? '#ef4444' : '#f59e0b'}">${getStatusText(status)}</div>
+        </div>
+        <div class="stat-item">
+            <div class="label"><span class="mini-icon blue"><i class="fas fa-microchip"></i></span> CPU</div>
+            <div class="value">${info.cpu_usage != null ? info.cpu_usage.toFixed(1) + '%' : '--'}</div>
+        </div>
+        <div class="stat-item">
+            <div class="label"><span class="mini-icon cyan"><i class="fas fa-memory"></i></span> 内存</div>
+            <div class="value">${info.memory_usage != null ? info.memory_usage.toFixed(1) + '%' : '--'}</div>
+        </div>
+        <div class="stat-item">
+            <div class="label"><span class="mini-icon yellow"><i class="fas fa-hdd"></i></span> 内存占用</div>
+            <div class="value">${info.mem_mb != null ? info.mem_mb + 'MB' : '--'}</div>
+        </div>
+        <div class="stat-item">
+            <div class="label"><span class="mini-icon green"><i class="fas fa-network-wired"></i></span> 网络入站</div>
+            <div class="value">${formatBytes(info.network_in || 0)}</div>
+        </div>
+        <div class="stat-item">
+            <div class="label"><span class="mini-icon blue"><i class="fas fa-network-wired"></i></span> 网络出站</div>
+            <div class="value">${formatBytes(info.network_out || 0)}</div>
+        </div>
+        <div class="stat-item">
+            <div class="label"><span class="mini-icon cyan"><i class="fas fa-brain"></i></span> 模型</div>
+            <div class="value" style="font-size:13px">${info.model || '--'}</div>
+        </div>
+        <div class="stat-item">
+            <div class="label"><span class="mini-icon yellow"><i class="fas fa-phone-volume"></i></span> API 调用</div>
+            <div class="value">${info.api_calls || 0}</div>
+        </div>
+    `;
+
+    panel.classList.add('active');
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function formatBytes(bytes) {
+    if (bytes < 1024) return bytes + 'B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + 'KB';
+    if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + 'MB';
+    return (bytes / (1024 * 1024 * 1024)).toFixed(1) + 'GB';
+}
+
+function formatUptime(seconds) {
+    const d = Math.floor(seconds / 86400);
+    const h = Math.floor((seconds % 86400) / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    if (d > 0) return d + '天' + h + '时';
+    if (h > 0) return h + '时' + m + '分';
+    return m + '分';
+}
+
+// ===== 更新 HUD =====
+function updateHUD(data) {
+    const agents = data.agents || {};
+    const sys = data.system_info || {};
+    const agentIds = Object.keys(agents);
+
+    document.getElementById('hud-agents').textContent = agentIds.length;
+    document.getElementById('hud-working').textContent = agentIds.filter(id => agents[id].status === 'online').length;
+    document.getElementById('hud-idle').textContent = agentIds.filter(id => agents[id].status !== 'online').length;
+    document.getElementById('hud-cpu').textContent = sys.total_cpu != null ? sys.total_cpu.toFixed(1) + '%' : '--';
+    document.getElementById('hud-mem').textContent = sys.total_memory != null ? sys.total_memory.toFixed(1) + '%' : '--';
+    document.getElementById('hud-uptime').textContent = formatUptime(sys.server_uptime_seconds || 0);
+    document.getElementById('lastUpdate').textContent = '更新: ' + new Date().toLocaleTimeString('zh-CN');
+}
+
+// ===== 数据获取 =====
+async function fetchData() {
+    try {
+        const resp = await fetch(API_HOST + '/api/status');
+        const data = await resp.json();
+        renderCharacters(data.agents || {});
+        updateHUD(data);
+    } catch (e) {
+        console.error('获取数据失败:', e);
+    }
+}
+
+// ===== SSE 实时更新 =====
+let sseConnected = false;
+function connectSSE() {
+    const evtSource = new EventSource(API_HOST + '/api/events');
+    evtSource.onopen = function() {
+        sseConnected = true;
+        console.log('✅ 像素工坊 SSE 已连接');
+    };
+    evtSource.onmessage = function(e) {
         try {
-            const resp = await fetch(API_HOST + '/api/changelog');
-            const data = await resp.json();
-            const entries = data.entries || [];
+            const msg = JSON.parse(e.data);
+            if (msg.data) {
+                renderCharacters(msg.data.agents || {});
+                updateHUD(msg.data);
+            }
+        } catch(err) { console.error('SSE parse error:', err); }
+    };
+    evtSource.onerror = function() {
+        sseConnected = false;
+        console.warn('⚠️ SSE 断开，3秒后重试...');
+        evtSource.close();
+        setTimeout(connectSSE, 3000);
+    };
+}
 
-            let totalChanges = 0, uiChanges = 0, fixChanges = 0;
-            entries.forEach(function(entry) {
-                (entry.changes || []).forEach(function(c) {
-                    totalChanges++;
-                    const t = c.type || '';
-                    if (t === '界面' || t === '优化' || t === '重构') uiChanges++;
-                    if (t === '修复') fixChanges++;
-                });
-            });
-            document.getElementById('stat-total-versions').textContent = entries.length;
-            document.getElementById('stat-total-changes').textContent = totalChanges;
-            document.getElementById('stat-ui-changes').textContent = uiChanges;
-            document.getElementById('stat-fix-changes').textContent = fixChanges;
+// ===== 初始化 =====
+fetchData();
+connectSSE();
 
-            const timeline = document.getElementById('timeline');
-            let html = '';
-            entries.forEach(function(entry, i) {
-                const changes = entry.changes || [];
-                let itemsHtml = '';
-                changes.forEach(function(c) {
-                    const typeKey = TYPE_LABELS[c.type] || 'note';
-                    itemsHtml += '<li class="changelog-item"><span class="version-type ' + esc(typeKey) + '">' + esc(c.type) + '</span>' + esc(c.desc) + '</li>';
-                });
-                html += '<div class="version-entry" style="animation-delay:' + (i * 0.05) + 's">' +
-                    '<div class="version-header"><span class="version-number">' + esc(entry.version) + '</span><span class="version-date">' + esc(entry.date) + '</span></div>' +
-                    '<div class="version-card"><ul class="changelog-list">' + itemsHtml + '</ul></div>' +
-                '</div>';
-            });
-            timeline.innerHTML = html;
-        } catch(e) {
-            document.getElementById('timeline').innerHTML = '<div style="color:var(--accent-6);text-align:center;padding:40px;">加载失败: ' + e.message + '</div>';
-        }
+// 点击舞台空白处关闭详情面板
+document.getElementById('gameStage').addEventListener('click', function(e) {
+    if (e.target === this || e.target.classList.contains('pixel-grid') || e.target.classList.contains('pixel-ground')) {
+        document.getElementById('characterPanel').classList.remove('active');
     }
-
-    loadChangelog();</script>
-    <script src="auth.js?v=20260429"></script>
+});
+</script>
+<script src="auth.js?v=20260429"></script>
 <script src="navbar.js?v=20260429"></script>
 </body>
 </html>

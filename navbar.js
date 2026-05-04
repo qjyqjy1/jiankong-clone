@@ -15,7 +15,7 @@
         { path: 'sessions.html', icon: 'fa-comments',  label: '会话管理' },
         { path: 'skills.html',   icon: 'fa-puzzle-piece', label: '技能管理' },
         { path: 'systems.html',  icon: 'fa-server',    label: '智能系统' },
-        { path: 'changelog.html',icon: 'fa-history',   label: '更新日志' }
+        { path: 'changelog.html',icon: 'fa-gamepad',   label: '像素工坊' }
     ];
 
     // 当前页面
