@@ -1171,71 +1171,9 @@ def _scan_services() -> list[dict[str, Any]]:
     return services
 
 
-# ─── changelog ────────────────────────────────────────────────────────────────
-
-def _load_changelog_entries() -> list[dict[str, Any]]:
-    """Return changelog entries embedded in server."""
-    return [
-        {
-            "version": "v1.4.0",
-            "date": "2026-05-04",
-            "changes": [
-                {"type": "新功能", "desc": "新增文件管理页面：浏览、编辑、上传、下载服务器文件"},
-                {"type": "新功能", "desc": "智能系统项目浏览改为文件浏览器弹窗"},
-                {"type": "新功能", "desc": "模型管理新增供应商配置：修改 URL、API Key、模型"},
-                {"type": "修复", "desc": "仪表盘和面板信息改为本机实时数据，不再依赖上游"},
-                {"type": "修复", "desc": "会话管理数据联动，自动扫描 OpenClaw 和 Codex 会话"},
-                {"type": "修复", "desc": "Token 统计按来源分布改为动态渲染"},
-                {"type": "修复", "desc": "完全清除 Hermes 硬编码，所有智能体动态检测"},
-                {"type": "修复", "desc": "测试连接接口无需登录即可使用"},
-                {"type": "修复", "desc": "更新日志改为从 API 动态加载"},
-            ]
-        },
-        {
-            "version": "v1.3.0",
-            "date": "2026-04-30",
-            "changes": [
-                {"type": "修复", "desc": "模型列表不再从 provider 拉全量，只展示 agent 实际配置的模型"},
-                {"type": "修复", "desc": "系统信息（CPU/内存/磁盘/网络）使用 psutil 读取真实数据"},
-                {"type": "修复", "desc": "会话列表扫描真实 rollout 文件"},
-                {"type": "修复", "desc": "服务列表从 systemctl running 检测真实运行中的服务"},
-            ]
-        },
-        {
-            "version": "v1.2.0",
-            "date": "2026-04-30",
-            "changes": [
-                {"type": "新功能", "desc": "新增 /api/stats 汇总端点"},
-                {"type": "修复", "desc": "前端 refreshDashboard 并行请求提速"},
-            ]
-        },
-        {
-            "version": "v1.1.0",
-            "date": "2026-04-29",
-            "changes": [
-                {"type": "新功能", "desc": "小猪智能体面板初版上线（端口1234）"},
-                {"type": "新功能", "desc": "仪表盘、模型管理、会话管理、技能管理、智能系统"},
-            ]
-        },
-    ]
-
-
-def _fallback_changelog() -> dict[str, Any]:
-    entries = _load_changelog_entries()
-    return {
-        "entries": entries,
-        "total_versions": len(entries),
-        "updated_at": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time())),
-    }
-
 
 def _current_panel_version() -> str:
-    entries = _load_changelog_entries()
-    if entries and isinstance(entries[0], dict):
-        version = str(entries[0].get("version") or "").strip()
-        if version:
-            return version
-    return "v3.15.0"
+    return "v1.5.0"
 
 
 # ─── projects (workspace scan) ───────────────────────────────────────────────
@@ -1759,8 +1697,6 @@ def _fallback_payload(api_path: str, query: str = "", post_body: dict[str, Any] 
             "skills": _scan_skills(),
             "uptime": _format_uptime(_get_system_info().get("server_uptime_seconds", 0)),
         }
-    if api_path == "/api/changelog":
-        return _fallback_changelog()
     if api_path == "/api/switch_model":
         aid = agent_id or q.get("agent", [""])[0]
         mid = model_id or q.get("model", [""])[0]
@@ -1898,11 +1834,6 @@ def _normalize_response(path: str, payload: Any) -> Any:
 
     if path == "/api/call_stats" and isinstance(data, dict):
         pass  # by_source keys are already agent IDs
-
-    if path == "/api/changelog" and isinstance(data, dict):
-        entries = data.get("entries")
-        if not isinstance(entries, list):
-            data["entries"] = []
 
     return data
 
@@ -2119,7 +2050,7 @@ class PanelHandler(SimpleHTTPRequestHandler):
             return
 
         # Force local data for endpoints where upstream lacks our agent data
-        _force_local = {"/api/status", "/api/call_stats", "/api/sessions", "/api/skills", "/api/systems", "/api/changelog", "/api/models", "/api/agent_config", "/api/agent_config/fetch_models", "/api/files", "/api/files/write", "/api/files/delete", "/api/files/mkdir", "/api/files/upload"}
+        _force_local = {"/api/status", "/api/call_stats", "/api/sessions", "/api/skills", "/api/systems", "/api/models", "/api/agent_config", "/api/agent_config/fetch_models", "/api/files", "/api/files/write", "/api/files/delete", "/api/files/mkdir", "/api/files/upload"}
         # Service control must always hit local fallback (real systemctl), never upstream
         if method == "GET" and (path in _force_local or path.startswith("/api/service/")):
             fallback = _fallback_payload(path, query)
