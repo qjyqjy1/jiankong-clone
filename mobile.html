@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0d0f1a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Agent Monitor">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="description" content="服务器 & Agent 状态监控">
+<title>Agent Monitor</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="manifest" data-pwa-manifest>
+<style>
+:root {
+  --bg: #0d0f1a;
+  --bg-card: #14162a;
+  --bg-card2: #1a1d35;
+  --border: rgba(255,255,255,0.08);
+  --border-glow: rgba(255,255,255,0.15);
+  --text: #e0e0f0;
+  --text-muted: #6b6b8a;
+  --accent: #6366f1;
+  --green: #10b981;
+  --red: #ef4444;
+  --yellow: #f59e0b;
+  --cyan: #06b6d4;
+  --purple: #a78bfa;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding: 12px;
+  padding-bottom: 80px;
+}
+
+/* ===== Header ===== */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 4px 16px;
+}
+.header h1 {
+  font-size: 18px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.header h1 i { color: var(--accent); }
+.header .time {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* ===== Server Stats ===== */
+.server-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.stat-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 6px;
+  text-align: center;
+}
+.stat-box .stat-icon {
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+.stat-box .stat-value {
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+.stat-box .stat-label {
+  font-size: 9px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.stat-bar {
+  height: 3px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 2px;
+  margin-top: 6px;
+  overflow: hidden;
+}
+.stat-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.5s ease;
+}
+
+/* ===== Agent Cards ===== */
+.section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 8px 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.section-title i { color: var(--accent); }
+
+.agent-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 10px;
+  transition: border-color 0.3s;
+}
+.agent-card.online { border-left: 3px solid var(--green); }
+.agent-card.offline { border-left: 3px solid var(--red); }
+.agent-card.stopped { border-left: 3px solid var(--text-muted); }
+
+.agent-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.agent-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.agent-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+.agent-avatar.oc { background: rgba(99,102,241,0.2); color: var(--accent); }
+.agent-avatar.cd { background: rgba(6,182,212,0.2); color: var(--cyan); }
+.agent-avatar.hm { background: rgba(16,185,129,0.2); color: var(--green); }
+.agent-avatar.unknown { background: rgba(255,255,255,0.1); color: var(--text-muted); }
+
+.agent-name { font-size: 15px; font-weight: 700; }
+.agent-model { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+
+.agent-status-badge {
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 600;
+}
+.agent-status-badge.online { background: rgba(16,185,129,0.15); color: var(--green); }
+.agent-status-badge.offline { background: rgba(239,68,68,0.15); color: var(--red); }
+.agent-status-badge.stopped { background: rgba(107,107,138,0.15); color: var(--text-muted); }
+
+.agent-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.metric {
+  background: var(--bg-card2);
+  border-radius: 8px;
+  padding: 8px;
+  text-align: center;
+}
+.metric .metric-value {
+  font-size: 14px;
+  font-weight: 700;
+}
+.metric .metric-label {
+  font-size: 9px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* ===== Bottom Nav ===== */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(13,15,26,0.95);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-around;
+  padding: 8px 0;
+  z-index: 100;
+}
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  color: var(--text-muted);
+  font-size: 9px;
+  text-decoration: none;
+  padding: 4px 12px;
+}
+.nav-item i { font-size: 18px; margin-bottom: 2px; }
+.nav-item.active { color: var(--accent); }
+
+/* ===== Refresh Button ===== */
+.refresh-btn {
+  position: fixed;
+  bottom: 70px;
+  right: 16px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: none;
+  color: #fff;
+  font-size: 18px;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(99,102,241,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99;
+}
+.refresh-btn:active { transform: scale(0.9); }
+.refresh-btn.spinning i { animation: spin 1s linear infinite; }
+@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+
+/* ===== Loading ===== */
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: var(--text-muted);
+}
+.loading i { font-size: 32px; margin-bottom: 12px; animation: pulse 1.5s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:0.4} 50%{opacity:1} }
+
+/* ===== Toast ===== */
+.toast {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-80px);
+  background: var(--bg-card2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 13px;
+  z-index: 200;
+  transition: transform 0.3s ease;
+  white-space: nowrap;
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+
+/* ===== Page ===== */
+.page { display: none; }
+.page.active { display: block; }
+
+/* ===== Settings Page ===== */
+.settings-item {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.settings-item .label { font-size: 14px; }
+.settings-item .value { font-size: 13px; color: var(--text-muted); }
+input[type="text"], input[type="number"] {
+  background: var(--bg-card2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  color: var(--text);
+  font-size: 14px;
+  width: 100%;
+  margin-top: 6px;
+}
+.btn {
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-block { width: 100%; }
+
+/* ===== Agent Detail ===== */
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.detail-row:last-child { border-bottom: none; }
+.detail-row .key { color: var(--text-muted); }
+.detail-row .val { font-weight: 600; }
+</style>
+</head>
+<body>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Refresh Button -->
+<button class="refresh-btn" id="refreshBtn" onclick="manualRefresh()">
+  <i class="fas fa-sync-alt"></i>
+</button>
+
+<!-- ===== Dashboard Page ===== -->
+<div class="page active" id="page-dashboard">
+  <div class="header">
+    <h1><i class="fas fa-server"></i> Agent Monitor</h1>
+    <div class="time" id="updateTime">--:--:--</div>
+  </div>
+
+  <!-- Server Stats -->
+  <div class="server-stats" id="serverStats">
+    <div class="stat-box">
+      <div class="stat-icon" style="color:var(--accent)"><i class="fas fa-microchip"></i></div>
+      <div class="stat-value" id="srvCpu">--</div>
+      <div class="stat-label">CPU</div>
+      <div class="stat-bar"><div class="stat-bar-fill" id="srvCpuBar" style="width:0%;background:var(--accent)"></div></div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-icon" style="color:var(--cyan)"><i class="fas fa-memory"></i></div>
+      <div class="stat-value" id="srvMem">--</div>
+      <div class="stat-label">内存</div>
+      <div class="stat-bar"><div class="stat-bar-fill" id="srvMemBar" style="width:0%;background:var(--cyan)"></div></div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-icon" style="color:var(--purple)"><i class="fas fa-hdd"></i></div>
+      <div class="stat-value" id="srvDisk">--</div>
+      <div class="stat-label">磁盘</div>
+      <div class="stat-bar"><div class="stat-bar-fill" id="srvDiskBar" style="width:0%;background:var(--purple)"></div></div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-icon" style="color:var(--green)"><i class="fas fa-clock"></i></div>
+      <div class="stat-value" id="srvUptime">--</div>
+      <div class="stat-label">运行时间</div>
+    </div>
+  </div>
+
+  <!-- Agents -->
+  <div class="section-title"><i class="fas fa-robot"></i> 智能体状态</div>
+  <div id="agentsContainer">
+    <div class="loading"><i class="fas fa-circle-notch fa-spin"></i><div>加载中...</div></div>
+  </div>
+</div>
+
+<!-- ===== Agents Detail Page ===== -->
+<div class="page" id="page-agents">
+  <div class="header">
+    <h1><i class="fas fa-robot"></i> 智能体详情</h1>
+    <div class="time" id="agentsUpdateTime">--:--:--</div>
+  </div>
+  <div id="agentsDetailContainer"></div>
+</div>
+
+<!-- ===== Settings Page ===== -->
+<div class="page" id="page-settings">
+  <div class="header">
+    <h1><i class="fas fa-cog"></i> 设置</h1>
+  </div>
+  <div class="settings-item">
+    <div>
+      <div class="label">服务器地址</div>
+      <input type="text" id="serverUrl" placeholder="http://38.76.188.102:1234" value="http://38.76.188.102:1234">
+    </div>
+  </div>
+  <div class="settings-item">
+    <div>
+      <div class="label">刷新间隔（秒）</div>
+      <input type="number" id="refreshInterval" placeholder="30" value="30" min="5" max="300">
+    </div>
+  </div>
+  <div class="settings-item">
+    <div>
+      <div class="label">用户名</div>
+      <input type="text" id="username" placeholder="qjyqjy" value="qjyqjy">
+    </div>
+  </div>
+  <div class="settings-item">
+    <div>
+      <div class="label">密码</div>
+      <input type="text" id="password" placeholder="密码" value="a970812qian" type="password">
+    </div>
+  </div>
+  <div style="padding:16px 0">
+    <button class="btn btn-primary btn-block" onclick="saveSettings()">保存设置</button>
+  </div>
+  <div style="text-align:center;color:var(--text-muted);font-size:12px;padding:8px;">
+    Agent Monitor v1.0 | 小猪智能体面板
+  </div>
+</div>
+
+<!-- ===== Bottom Nav ===== -->
+<div class="bottom-nav">
+  <a class="nav-item active" id="nav-dashboard" onclick="showPage('dashboard')">
+    <i class="fas fa-home"></i>
+    <span>监控</span>
+  </a>
+  <a class="nav-item" id="nav-agents" onclick="showPage('agents')">
+    <i class="fas fa-robot"></i>
+    <span>智能体</span>
+  </a>
+  <a class="nav-item" id="nav-settings" onclick="showPage('settings')">
+    <i class="fas fa-cog"></i>
+    <span>设置</span>
+  </a>
+</div>
+
+<script>
+// ===== Config =====
+const DEFAULT_API = window.location.origin;
+let API_URL = localStorage.getItem('apiUrl') || DEFAULT_API;
+let REFRESH_MS = parseInt(localStorage.getItem('refreshMs') || '30000');
+let USERNAME = localStorage.getItem('username') || 'qjyqjy';
+let PASSWORD = localStorage.getItem('password') || 'a970812qian';
+let authCookie = localStorage.getItem('authCookie') || '';
+
+// ===== Init =====
+document.getElementById('serverUrl').value = API_URL;
+document.getElementById('refreshInterval').value = REFRESH_MS / 1000;
+document.getElementById('username').value = USERNAME;
+document.getElementById('password').value = PASSWORD;
+
+// ===== Auth =====
+async function login() {
+  try {
+    const resp = await fetch(API_URL + '/api/auth/login', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({username: USERNAME, password: PASSWORD})
+    });
+    const d = await resp.json();
+    if (d.success) {
+      // Extract cookie from response
+      authCookie = 'authenticated=1';
+      localStorage.setItem('authCookie', authCookie);
+      return true;
+    }
+  } catch(e) {}
+  return false;
+}
+
+// ===== Fetch Status =====
+async function fetchStatus() {
+  try {
+    const resp = await fetch(API_URL + '/api/status', {
+      headers: authCookie ? {'Cookie': authCookie} : {}
+    });
+    if (resp.status === 401) {
+      // Need to login
+      const ok = await login();
+      if (!ok) throw new Error('认证失败');
+      return fetchStatus();
+    }
+    return await resp.json();
+  } catch(e) {
+    throw e;
+  }
+}
+
+// ===== Render Dashboard =====
+function renderDashboard(data) {
+  const sys = data.system_info || {};
+  const agents = data.agents || {};
+
+  // Server stats
+  const cpu = sys.total_cpu || 0;
+  const mem = sys.total_memory || 0;
+  const disk = sys.total_disk || 0;
+  document.getElementById('srvCpu').textContent = cpu.toFixed(1) + '%';
+  document.getElementById('srvMem').textContent = mem.toFixed(1) + '%';
+  document.getElementById('srvDisk').textContent = disk.toFixed(1) + '%';
+  document.getElementById('srvUptime').textContent = formatUptime(sys.server_uptime_seconds || 0);
+  document.getElementById('srvCpuBar').style.width = cpu + '%';
+  document.getElementById('srvMemBar').style.width = mem + '%';
+  document.getElementById('srvDiskBar').style.width = disk + '%';
+
+  // Color thresholds
+  document.getElementById('srvCpuBar').style.background = cpu > 80 ? 'var(--red)' : cpu > 60 ? 'var(--yellow)' : 'var(--accent)';
+  document.getElementById('srvMemBar').style.background = mem > 80 ? 'var(--red)' : mem > 60 ? 'var(--yellow)' : 'var(--cyan)';
+  document.getElementById('srvDiskBar').style.background = disk > 85 ? 'var(--red)' : disk > 70 ? 'var(--yellow)' : 'var(--purple)';
+
+  // Agents
+  const container = document.getElementById('agentsContainer');
+  const agentIds = Object.keys(agents);
+  if (agentIds.length === 0) {
+    container.innerHTML = '<div class="loading"><i class="fas fa-exclamation-triangle"></i><div>暂无数据</div></div>';
+    return;
+  }
+
+  let html = '';
+  for (const [aid, info] of Object.entries(agents)) {
+    const status = info.status || 'unknown';
+    const isOnline = status === 'online';
+    const avatarClass = aid === 'openclaw' ? 'oc' : aid === 'codex' ? 'cd' : aid === 'hermes' ? 'hm' : 'unknown';
+    const avatarIcon = aid === 'openclaw' ? 'fa-robot' : aid === 'codex' ? 'fa-code' : aid === 'hermes' ? 'fa-user-md' : 'fa-microchip';
+    const cardClass = isOnline ? 'online' : (status === 'stopped' ? 'stopped' : 'offline');
+    const badgeClass = isOnline ? 'online' : (status === 'stopped' ? 'stopped' : 'offline');
+
+    html += `
+    <div class="agent-card ${cardClass}" onclick="showAgentDetail('${aid}')">
+      <div class="agent-header">
+        <div class="agent-info">
+          <div class="agent-avatar ${avatarClass}"><i class="fas ${avatarIcon}"></i></div>
+          <div>
+            <div class="agent-name">${escHtml(info.name || aid)}</div>
+            <div class="agent-model">${escHtml(info.model || '--')}</div>
+          </div>
+        </div>
+        <span class="agent-status-badge ${badgeClass}">${isOnline ? '● 在线' : '● 离线'}</span>
+      </div>
+      <div class="agent-metrics">
+        <div class="metric">
+          <div class="metric-value" style="color:${info.cpu_usage > 50 ? 'var(--red)' : 'var(--text)'}">${(info.cpu_usage || 0).toFixed(1)}%</div>
+          <div class="metric-label">CPU</div>
+        </div>
+        <div class="metric">
+          <div class="metric-value" style="color:${info.memory_usage > 50 ? 'var(--red)' : 'var(--text)'}">${(info.memory_usage || 0).toFixed(1)}%</div>
+          <div class="metric-label">内存</div>
+        </div>
+        <div class="metric">
+          <div class="metric-value">${info.mem_mb || 0}MB</div>
+          <div class="metric-label">占用</div>
+        </div>
+      </div>
+    </div>`;
+  }
+  container.innerHTML = html;
+
+  // Update time
+  document.getElementById('updateTime').textContent = new Date().toLocaleTimeString('zh-CN');
+}
+
+// ===== Render Agents Detail =====
+function renderAgentsDetail(data) {
+  const agents = data.agents || {};
+  const container = document.getElementById('agentsDetailContainer');
+  let html = '';
+  for (const [aid, info] of Object.entries(agents)) {
+    const status = info.status || 'unknown';
+    const isOnline = status === 'online';
+    html += `
+    <div class="agent-card ${isOnline ? 'online' : 'stopped'}">
+      <div class="agent-header">
+        <div class="agent-info">
+          <div class="agent-avatar ${aid === 'openclaw' ? 'oc' : aid === 'codex' ? 'cd' : 'hm'}">
+            <i class="fas ${aid === 'openclaw' ? 'fa-robot' : aid === 'codex' ? 'fa-code' : 'fa-user-md'}"></i>
+          </div>
+          <div>
+            <div class="agent-name">${escHtml(info.name || aid)}</div>
+            <div class="agent-model">${escHtml(info.model || '--')}</div>
+          </div>
+        </div>
+        <span class="agent-status-badge ${isOnline ? 'online' : 'stopped'}">${isOnline ? '在线' : '离线'}</span>
+      </div>
+      <div class="detail-row"><span class="key">状态</span><span class="val">${status}</span></div>
+      <div class="detail-row"><span class="key">CPU</span><span class="val">${(info.cpu_usage || 0).toFixed(1)}%</span></div>
+      <div class="detail-row"><span class="key">内存</span><span class="val">${(info.memory_usage || 0).toFixed(1)}% (${info.mem_mb || 0}MB)</span></div>
+      <div class="detail-row"><span class="key">运行时间</span><span class="val">${formatUptime(info.uptime_seconds || 0)}</span></div>
+      <div class="detail-row"><span class="key">API调用</span><span class="val">${info.api_calls || 0}</span></div>
+      <div class="detail-row"><span class="key">PID</span><span class="val">${info.pid || '--'}</span></div>
+    </div>`;
+  }
+  container.innerHTML = html;
+  document.getElementById('agentsUpdateTime').textContent = new Date().toLocaleTimeString('zh-CN');
+}
+
+// ===== Show Agent Detail =====
+function showAgentDetail(aid) {
+  showPage('agents');
+}
+
+// ===== Page Navigation =====
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.getElementById('nav-' + name).classList.add('active');
+}
+
+// ===== Settings =====
+function saveSettings() {
+  API_URL = document.getElementById('serverUrl').value.trim();
+  REFRESH_MS = parseInt(document.getElementById('refreshInterval').value) * 1000;
+  USERNAME = document.getElementById('username').value.trim();
+  PASSWORD = document.getElementById('password').value.trim();
+  authCookie = '';
+
+  localStorage.setItem('apiUrl', API_URL);
+  localStorage.setItem('refreshMs', REFRESH_MS);
+  localStorage.setItem('username', USERNAME);
+  localStorage.setItem('password', PASSWORD);
+  localStorage.removeItem('authCookie');
+
+  showToast('✅ 设置已保存');
+  showPage('dashboard');
+  refreshData();
+}
+
+// ===== Toast =====
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ===== Refresh =====
+async function refreshData() {
+  try {
+    const data = await fetchStatus();
+    renderDashboard(data);
+    renderAgentsDetail(data);
+  } catch(e) {
+    console.error('Refresh failed:', e);
+    showToast('❌ 连接失败: ' + e.message);
+  }
+}
+
+function manualRefresh() {
+  const btn = document.getElementById('refreshBtn');
+  btn.classList.add('spinning');
+  refreshData().finally(() => setTimeout(() => btn.classList.remove('spinning'), 500));
+}
+
+// ===== Helpers =====
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function formatUptime(sec) {
+  sec = parseInt(sec) || 0;
+  const d = Math.floor(sec / 86400);
+  const h = Math.floor((sec % 86400) / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  if (d > 0) return d + '天' + h + '时';
+  if (h > 0) return h + '时' + m + '分';
+  return m + '分';
+}
+
+// ===== SSE + Polling =====
+let sseConnected = false;
+function connectSSE() {
+  try {
+    const es = new EventSource(API_URL + '/api/events');
+    es.onopen = () => { sseConnected = true; console.log('SSE OK'); };
+    es.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.data) { renderDashboard(msg.data); renderAgentsDetail(msg.data); }
+      } catch(err) {}
+    };
+    es.onerror = () => { sseConnected = false; es.close(); setTimeout(connectSSE, 5000); };
+  } catch(e) {
+    setTimeout(connectSSE, 5000);
+  }
+}
+
+// ===== Start =====
+refreshData();
+connectSSE();
+// Fallback polling every 30s
+setInterval(() => { if (!sseConnected) refreshData(); }, REFRESH_MS);
+</script>
+</body>
+</html>
