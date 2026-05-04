@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="navbar.css?v=20260429">
 <style>
 /* =========================================================
-   像素农场 - 纯 CSS 横版像素场景
+   像素农场 v3.0 - 经典横版像素小游戏
    ========================================================= */
 .pixel-farm {
   position: relative;
@@ -31,19 +31,13 @@
   transition: background 3s ease;
   z-index: 0;
 }
-.farm-sky.day {
-  background: linear-gradient(180deg, #87CEEB 0%, #B0E0F6 40%, #E0F0FF 100%);
-}
-.farm-sky.night {
-  background: linear-gradient(180deg, #0a0e27 0%, #162040 50%, #1a2545 100%);
-}
+.farm-sky.day   { background: linear-gradient(180deg, #87CEEB 0%, #B0E0F6 40%, #E0F0FF 100%); }
+.farm-sky.night { background: linear-gradient(180deg, #0a0e27 0%, #162040 50%, #1a2545 100%); }
 
-/* 太阳/月亮 */
 .farm-sun {
   position: absolute; top: 18px; right: 12%;
   width: 36px; height: 36px;
   background: #FFE44D;
-  border-radius: 0;
   box-shadow: 0 0 20px rgba(255,228,77,0.6);
   transition: all 3s ease;
 }
@@ -52,229 +46,105 @@
   box-shadow: 0 0 16px rgba(232,232,240,0.4);
 }
 
-/* 云朵 - 像素方块 */
+/* 星星 */
+.farm-star {
+  position: absolute;
+  width: 3px; height: 3px;
+  background: #fff;
+  opacity: 0;
+  transition: opacity 3s ease;
+}
+.farm-star.visible { opacity: 0.8; animation: starTwinkle 2s ease-in-out infinite; }
+@keyframes starTwinkle { 0%,100%{opacity:0.4} 50%{opacity:0.9} }
+
+/* 云朵 */
 .farm-cloud {
   position: absolute;
   background: #fff;
-  opacity: 0.9;
+  opacity: 0.85;
   box-shadow:
     8px 0 0 #fff, 16px 0 0 #fff, 24px 0 0 #fff,
     0 -8px 0 #fff, 8px -8px 0 #fff, 16px -8px 0 #fff,
     4px 8px 0 #fff, 12px 8px 0 #fff, 20px 8px 0 #fff;
-  animation: cloudFloat linear infinite;
+  animation: cloudDrift linear infinite;
 }
-@keyframes cloudFloat {
-  from { transform: translateX(0); }
-  to { transform: translateX(80px); }
-}
+@keyframes cloudDrift { from{transform:translateX(0)} to{transform:translateX(60px)} }
 
-/* 远山 */
-.farm-mountains {
-  position: absolute;
-  bottom: 45%; left: 0; right: 0;
-  height: 120px;
-  z-index: 1;
-}
-.farm-mountain {
-  position: absolute; bottom: 0;
-  width: 0; height: 0;
-  border-style: solid;
-}
-.farm-mountain.m1 {
-  left: -20px;
-  border-width: 0 80px 100px 80px;
-  border-color: transparent transparent #6B8E6B transparent;
-}
-.farm-mountain.m2 {
-  left: 120px;
-  border-width: 0 100px 130px 100px;
-  border-color: transparent transparent #5A7D5A transparent;
-}
-.farm-mountain.m3 {
-  left: 350px;
-  border-width: 0 90px 110px 90px;
-  border-color: transparent transparent #6B8E6B transparent;
-}
-.farm-mountain.m4 {
-  right: 40px;
-  border-width: 0 70px 90px 70px;
-  border-color: transparent transparent #5A7D5A transparent;
-}
+/* ===== 远山 ===== */
+.farm-mountains { position:absolute; bottom:45%; left:0; right:0; height:120px; z-index:1; }
+.farm-mountain { position:absolute; bottom:0; width:0; height:0; border-style:solid; }
+.farm-mountain.m1 { left:-20px; border-width:0 80px 100px 80px; border-color:transparent transparent #6B8E6B transparent; }
+.farm-mountain.m2 { left:120px; border-width:0 100px 130px 100px; border-color:transparent transparent #5A7D5A transparent; }
+.farm-mountain.m3 { left:350px; border-width:0 90px 110px 90px; border-color:transparent transparent #6B8E6B transparent; }
+.farm-mountain.m4 { right:40px; border-width:0 70px 90px 70px; border-color:transparent transparent #5A7D5A transparent; }
 
 /* ===== 地面 ===== */
-.farm-ground {
-  position: absolute; bottom: 0; left: 0; right: 0;
-  height: 45%;
-  z-index: 2;
-}
+.farm-ground { position:absolute; bottom:0; left:0; right:0; height:45%; z-index:2; }
 .farm-grass {
-  position: absolute; top: 0; left: 0; right: 0;
-  height: 14px;
-  background: #4CAF50;
-  border-top: 3px solid #66BB6A;
-  box-shadow: 0 2px 0 #388E3C;
+  position:absolute; top:0; left:0; right:0; height:14px;
+  background:#4CAF50;
+  border-top:3px solid #66BB6A;
+  box-shadow:0 2px 0 #388E3C;
+}
+.farm-grass::before {
+  content:''; position:absolute; top:-6px; left:0; right:0; height:6px;
+  background:repeating-linear-gradient(90deg,
+    transparent 0, transparent 6px, #66BB6A 8px, transparent 8px, transparent 14px,
+    #4CAF50 16px, transparent 16px, transparent 22px);
 }
 .farm-dirt {
-  position: absolute; top: 14px; left: 0; right: 0; bottom: 0;
-  background: linear-gradient(180deg, #8B6914 0%, #7A5C12 20%, #6B4F10 60%, #5C420E 100%);
-}
-/* 草地装饰 */
-.farm-grass::before {
-  content: '';
-  position: absolute; top: -6px; left: 0; right: 0; height: 6px;
-  background:
-    repeating-linear-gradient(90deg,
-      transparent 0px, transparent 6px,
-      #66BB6A 6px, #66BB6A 8px,
-      transparent 8px, transparent 14px,
-      #4CAF50 14px, #4CAF50 16px,
-      transparent 16px, transparent 22px
-    );
+  position:absolute; top:14px; left:0; right:0; bottom:0;
+  background:linear-gradient(180deg,#8B6914 0%,#7A5C12 20%,#6B4F10 60%,#5C420E 100%);
 }
 
 /* ===== 栅栏 ===== */
-.farm-fence {
-  position: absolute;
-  bottom: 18%; z-index: 3;
-  display: flex; align-items: flex-end;
-}
+.farm-fence { position:absolute; bottom:18%; z-index:3; display:flex; align-items:flex-end; }
 .fence-post {
-  width: 8px; height: 32px;
-  background: linear-gradient(90deg, #A0522D 30%, #8B4513 70%);
-  margin: 0 10px;
-  border: 1px solid #6B3A0E;
-  position: relative;
+  width:8px; height:32px;
+  background:linear-gradient(90deg,#A0522D 30%,#8B4513 70%);
+  margin:0 10px; border:1px solid #6B3A0E; position:relative;
 }
 .fence-post::before {
-  content: '';
-  position: absolute; top: 4px; left: -12px;
-  width: 32px; height: 5px;
-  background: #A0522D;
-  border: 1px solid #6B3A0E;
+  content:''; position:absolute; top:4px; left:-12px;
+  width:32px; height:5px; background:#A0522D; border:1px solid #6B3A0E;
 }
 .fence-post::after {
-  content: '';
-  position: absolute; top: 18px; left: -12px;
-  width: 32px; height: 5px;
-  background: #A0522D;
-  border: 1px solid #6B3A0E;
+  content:''; position:absolute; top:18px; left:-12px;
+  width:32px; height:5px; background:#A0522D; border:1px solid #6B3A0E;
 }
 
-/* ===== 工位（电脑桌） ===== */
-.farm-desk {
-  position: absolute;
-  bottom: 14%; z-index: 5;
-}
+/* ===== 树 ===== */
+.farm-tree { position:absolute; bottom:14%; z-index:4; }
+.tree-trunk { width:12px; height:28px; background:linear-gradient(90deg,#6B3A0E,#8B5A2C,#6B3A0E); margin:0 auto; }
+.tree-leaves { width:32px; height:24px; background:#2E7D32; border:2px solid #1B5E20; margin:0 auto; position:relative; }
+.tree-leaves::before { content:''; position:absolute; top:-10px; left:4px; width:24px; height:14px; background:#388E3C; border:2px solid #2E7D32; }
+.tree-leaves::after  { content:''; position:absolute; top:-18px; left:8px; width:16px; height:10px; background:#43A047; border:2px solid #388E3C; }
+
+/* ===== 花 ===== */
+.farm-flower { position:absolute; bottom:13%; z-index:4; }
+.flower-stem { width:3px; height:12px; background:#388E3C; margin:0 auto; }
+.flower-head { width:10px; height:10px; border-radius:50%; margin:0 auto; }
+
+/* ===== 工位 ===== */
+.farm-desk { position:absolute; bottom:14%; z-index:5; }
 .desk-body {
-  width: 60px; height: 36px;
-  background: linear-gradient(180deg, #8B6914, #7A5C12);
-  border: 2px solid #5C420E;
-  position: relative;
+  width:60px; height:36px;
+  background:linear-gradient(180deg,#8B6914,#7A5C12);
+  border:2px solid #5C420E; position:relative;
 }
-.desk-body::before { /* drawer */
-  content: '';
-  position: absolute; top: 4px; left: 4px;
-  width: 52px; height: 14px;
-  background: #6B4F10;
-  border: 1px solid #5C420E;
-}
-.desk-body::after { /* drawer knob */
-  content: '';
-  position: absolute; top: 9px; left: 26px;
-  width: 8px; height: 4px;
-  background: #C8A04A;
-  border-radius: 2px;
-}
+.desk-body::before { content:''; position:absolute; top:4px; left:4px; width:52px; height:14px; background:#6B4F10; border:1px solid #5C420E; }
+.desk-body::after  { content:''; position:absolute; top:9px; left:26px; width:8px; height:4px; background:#C8A04A; border-radius:2px; }
 .desk-monitor {
-  position: absolute; bottom: 36px; left: 10px;
-  width: 40px; height: 30px;
-  background: #2C2C3A;
-  border: 2px solid #3C3C4A;
-  border-radius: 2px;
+  position:absolute; bottom:36px; left:10px;
+  width:40px; height:30px;
+  background:#2C2C3A; border:2px solid #3C3C4A; border-radius:2px;
 }
-.desk-monitor::before { /* screen */
-  content: '';
-  position: absolute; top: 3px; left: 3px; right: 3px; bottom: 6px;
-  background: linear-gradient(135deg, #1a3a5c, #1a2a4c);
-  border: 1px solid #1a4a6c;
-}
-.desk-monitor::after { /* stand */
-  content: '';
-  position: absolute; bottom: -6px; left: 50%;
-  transform: translateX(-50%);
-  width: 8px; height: 6px;
-  background: #3C3C4A;
-}
-.desk-keyboard {
-  position: absolute; bottom: 38px; left: 14px;
-  width: 32px; height: 8px;
-  background: #3C3C4A;
-  border: 1px solid #4C4C5A;
-}
-.desk-chair {
-  position: absolute;
-  bottom: 0; right: -18px;
-}
-.chair-seat {
-  width: 20px; height: 8px;
-  background: #4f46e5;
-  border: 2px solid #3730a3;
-}
-.chair-back {
-  position: absolute; bottom: 8px; left: 2px;
-  width: 16px; height: 18px;
-  background: #4f46e5;
-  border: 2px solid #3730a3;
-  border-bottom: none;
-}
-
-/* ===== 装饰：树 ===== */
-.farm-tree {
-  position: absolute;
-  bottom: 14%; z-index: 4;
-}
-.tree-trunk {
-  width: 12px; height: 28px;
-  background: linear-gradient(90deg, #6B3A0E, #8B5A2C, #6B3A0E);
-  margin: 0 auto;
-}
-.tree-leaves {
-  width: 32px; height: 24px;
-  background: #2E7D32;
-  border: 2px solid #1B5E20;
-  margin: 0 auto;
-  position: relative;
-}
-.tree-leaves::before {
-  content: '';
-  position: absolute; top: -10px; left: 4px;
-  width: 24px; height: 14px;
-  background: #388E3C;
-  border: 2px solid #2E7D32;
-}
-.tree-leaves::after {
-  content: '';
-  position: absolute; top: -18px; left: 8px;
-  width: 16px; height: 10px;
-  background: #43A047;
-  border: 2px solid #388E3C;
-}
-
-/* ===== 装饰：花朵 ===== */
-.farm-flower {
-  position: absolute;
-  bottom: 13%; z-index: 4;
-}
-.flower-stem {
-  width: 3px; height: 12px;
-  background: #388E3C;
-  margin: 0 auto;
-}
-.flower-head {
-  width: 10px; height: 10px;
-  border-radius: 50%;
-  margin: 0 auto;
-}
+.desk-monitor::before { content:''; position:absolute; top:3px; left:3px; right:3px; bottom:6px; background:linear-gradient(135deg,#1a3a5c,#1a2a4c); border:1px solid #1a4a6c; }
+.desk-monitor::after  { content:''; position:absolute; bottom:-6px; left:50%; transform:translateX(-50%); width:8px; height:6px; background:#3C3C4A; }
+.desk-keyboard { position:absolute; bottom:38px; left:14px; width:32px; height:8px; background:#3C3C4A; border:1px solid #4C4C5A; }
+.desk-chair { position:absolute; bottom:0; right:-18px; }
+.chair-seat { width:20px; height:8px; background:#4f46e5; border:2px solid #3730a3; }
+.chair-back { position:absolute; bottom:8px; left:2px; width:16px; height:18px; background:#4f46e5; border:2px solid #3730a3; border-bottom:none; }
 
 /* ===== 像素角色 ===== */
 .farm-character {
@@ -284,26 +154,18 @@
   flex-direction: column;
   align-items: center;
   cursor: pointer;
-  /* transition for smooth position changes */
-  transition: left 0.8s ease, bottom 0.8s ease;
+  /* 平滑移动 */
+  transition: left 1.2s ease-in-out, bottom 1.2s ease-in-out;
 }
 
-/* 角色精灵容器 */
 .char-sprite {
-  width: 40px;
-  height: 48px;
+  width: 40px; height: 48px;
   position: relative;
   image-rendering: pixelated;
 }
-
-/* 角色阴影 */
 .char-shadow {
-  position: absolute;
-  bottom: -4px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 24px;
-  height: 6px;
+  position: absolute; bottom: -4px; left: 50%; transform: translateX(-50%);
+  width: 24px; height: 6px;
   background: rgba(0,0,0,0.25);
   border-radius: 50%;
 }
@@ -321,193 +183,89 @@
   text-align: center;
 }
 
-/* ===== 角色像素精灵（SVG） ===== */
-/* 由 JS 注入 */
+/* ===== 行为动画 ===== */
 
-/* ===== 角色行为动画 ===== */
-
-/* 工作状态：原地打字抖动 */
-.farm-character.working {
-  animation: charWork 0.5s ease-in-out infinite;
+/* 工作：打字抖动 */
+.farm-character.working { animation: charType 0.4s ease-in-out infinite; }
+@keyframes charType {
+  0%,100% { transform: translateY(0) rotate(0); }
+  25%     { transform: translateY(-2px) rotate(-1deg); }
+  75%     { transform: translateY(-1px) rotate(1deg); }
 }
-@keyframes charWork {
-  0%, 100% { transform: translateY(0) rotate(0); }
-  25% { transform: translateY(-1px) rotate(-1deg); }
-  75% { transform: translateY(-1px) rotate(1deg); }
-}
-
-/* 工作状态：键盘闪烁 */
-.farm-character.working .desk-keyboard {
-  animation: keyTap 0.25s ease-in-out infinite;
-}
-@keyframes keyTap {
-  0%, 100% { background: #3C3C4A; }
-  50% { background: #5C5C6A; }
-}
-.farm-character.working .desk-monitor::before {
-  animation: screenGlow 0.8s ease-in-out infinite;
-}
-@keyframes screenGlow {
-  0%, 100% { background: linear-gradient(135deg, #1a3a5c, #1a2a4c); }
-  50% { background: linear-gradient(135deg, #2a5a8c, #2a4a7c); }
+.farm-character.working .desk-keyboard { animation: keyFlash 0.2s ease-in-out infinite; }
+@keyframes keyFlash { 0%,100%{background:#3C3C4A} 50%{background:#6C6C8A} }
+.farm-character.working .desk-monitor::before { animation: scrGlow 0.6s ease-in-out infinite; }
+@keyframes scrGlow {
+  0%,100% { background:linear-gradient(135deg,#1a3a5c,#1a2a4c); }
+  50%     { background:linear-gradient(135deg,#2a6aac,#2a5a9c); }
 }
 
-/* 空闲状态：闲逛 */
-.farm-character.idle {
-  animation: charIdle 6s ease-in-out infinite;
-}
-@keyframes charIdle {
-  0%   { transform: translateX(0); }
-  20%  { transform: translateX(25px); }
-  40%  { transform: translateX(40px) translateY(-3px); }
-  60%  { transform: translateX(20px); }
-  80%  { transform: translateX(-10px) translateY(-2px); }
-  100% { transform: translateX(0); }
-}
+/* 空闲：闲逛 + 摇摆 */
+.farm-character.idle .char-sprite { animation: charSway 3s ease-in-out infinite; }
+@keyframes charSway { 0%,100%{transform:rotate(0)} 30%{transform:rotate(-3deg)} 70%{transform:rotate(3deg)} }
 
-/* 空闲状态：身体轻微摇摆 */
-.farm-character.idle .char-sprite {
-  animation: charSway 2s ease-in-out infinite;
-}
-@keyframes charSway {
-  0%, 100% { transform: rotate(0); }
-  30% { transform: rotate(-2deg); }
-  70% { transform: rotate(2deg); }
-}
+/* 离线：灰暗 */
+.farm-character.offline .char-sprite { filter:grayscale(0.8) brightness(0.45); }
+.farm-character.offline .desk-monitor::before { background:#1a1a2a !important; animation:none !important; }
 
-/* 离线状态：灰暗 */
-.farm-character.offline .char-sprite {
-  filter: grayscale(0.8) brightness(0.5);
-}
-.farm-character.offline .desk-monitor::before {
-  background: #1a1a2a;
-}
-
-/* ===== 状态图例 ===== */
-.farm-legend {
-  display: flex;
-  gap: 20px;
-  padding: 10px 16px;
-  background: rgba(0,0,0,0.3);
-  border: 1px solid rgba(255,255,255,0.06);
-  border-radius: 8px;
-  margin-top: 12px;
-  flex-wrap: wrap;
-}
-.legend-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-.legend-dot {
-  width: 10px; height: 10px;
-  border-radius: 0;
-  border: 1px solid rgba(255,255,255,0.2);
-}
-.legend-dot.working { background: #10b981; }
-.legend-dot.idle { background: #f59e0b; }
-.legend-dot.offline { background: #ef4444; }
-
-/* ===== HUD 状态栏 ===== */
+/* ===== HUD ===== */
 .farm-hud {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 16px;
-  background: rgba(0,0,0,0.3);
-  border: 1px solid rgba(255,255,255,0.06);
-  border-radius: 8px;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-  gap: 8px;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:10px 16px; background:rgba(0,0,0,0.3);
+  border:1px solid rgba(255,255,255,0.06); border-radius:8px; margin-bottom:12px;
+  flex-wrap:wrap; gap:8px;
 }
-.farm-hud-left, .farm-hud-right { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
-.hud-item {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 12px; color: var(--text-secondary);
+.farm-hud-left,.farm-hud-right { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+.hud-item { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-secondary); }
+.hud-item .hud-val { font-weight:700; color:var(--text-primary); }
+.hud-sep { width:1px; height:16px; background:rgba(255,255,255,0.08); }
+
+/* ===== 图例 ===== */
+.farm-legend {
+  display:flex; gap:20px; padding:10px 16px;
+  background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.06);
+  border-radius:8px; margin-top:12px; flex-wrap:wrap;
 }
-.hud-item .hud-val { font-weight: 700; color: var(--text-primary); }
-.hud-sep { width: 1px; height: 16px; background: rgba(255,255,255,0.08); }
+.legend-item { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--text-secondary); }
+.legend-dot { width:10px; height:10px; border:1px solid rgba(255,255,255,0.2); }
+.legend-dot.working { background:#10b981; }
+.legend-dot.idle    { background:#f59e0b; }
+.legend-dot.offline { background:#ef4444; }
 
 /* ===== 详情面板 ===== */
 .farm-detail {
-  display: none;
-  background: rgba(0,0,0,0.25);
-  border: 1px solid rgba(255,255,255,0.06);
-  border-radius: 10px;
-  padding: 16px;
-  margin-top: 12px;
-  animation: detailIn 0.3s ease;
+  display:none; background:rgba(0,0,0,0.25);
+  border:1px solid rgba(255,255,255,0.06); border-radius:10px;
+  padding:16px; margin-top:12px;
+  animation: dIn 0.3s ease;
 }
-.farm-detail.active { display: block; }
-@keyframes detailIn {
-  from { opacity: 0; transform: translateY(-6px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-.farm-detail h3 {
-  font-size: 13px; font-weight: 700;
-  margin-bottom: 12px;
-  display: flex; align-items: center; gap: 8px;
-}
-.farm-detail h3 i { color: var(--accent-1); }
-.detail-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  gap: 10px;
-}
-.detail-card {
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.05);
-  border-radius: 6px;
-  padding: 10px;
-}
-.detail-card .d-label { font-size: 10px; color: var(--text-muted); margin-bottom: 4px; }
-.detail-card .d-val { font-size: 16px; font-weight: 800; }
-.mi { width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; border-radius: 3px; font-size: 10px; }
-.mi.g { background: rgba(16,185,129,0.15); color: #10b981; }
-.mi.b { background: rgba(99,102,241,0.15); color: #6366f1; }
-.mi.c { background: rgba(6,182,212,0.15); color: #06b6d4; }
-.mi.y { background: rgba(245,158,11,0.15); color: #f59e0b; }
-.mi.r { background: rgba(239,68,68,0.15); color: #ef4444; }
+.farm-detail.active { display:block; }
+@keyframes dIn { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
+.farm-detail h3 { font-size:13px; font-weight:700; margin-bottom:12px; display:flex; align-items:center; gap:8px; }
+.farm-detail h3 i { color:var(--accent-1); }
+.detail-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; }
+.detail-card { background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.05); border-radius:6px; padding:10px; }
+.detail-card .d-label { font-size:10px; color:var(--text-muted); margin-bottom:4px; }
+.detail-card .d-val { font-size:16px; font-weight:800; }
+.mi { width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center; border-radius:3px; font-size:10px; }
+.mi.g { background:rgba(16,185,129,0.15); color:#10b981; }
+.mi.b { background:rgba(99,102,241,0.15); color:#6366f1; }
+.mi.c { background:rgba(6,182,212,0.15); color:#06b6d4; }
+.mi.y { background:rgba(245,158,11,0.15); color:#f59e0b; }
+.mi.r { background:rgba(239,68,68,0.15); color:#ef4444; }
 
-/* ===== 昼夜切换按钮 ===== */
+/* ===== 昼夜按钮 ===== */
 .farm-toggle {
-  position: absolute; top: 10px; right: 10px; z-index: 50;
-  padding: 6px 12px;
-  background: rgba(0,0,0,0.5);
-  border: 1px solid rgba(255,255,255,0.15);
-  border-radius: 6px;
-  color: #fff;
-  font-size: 11px;
-  cursor: pointer;
-  font-family: 'Press Start 2P', monospace;
-  font-size: 8px;
+  position:absolute; top:10px; right:10px; z-index:50;
+  padding:6px 12px; background:rgba(0,0,0,0.5);
+  border:1px solid rgba(255,255,255,0.15); border-radius:6px;
+  color:#fff; cursor:pointer; font-family:'Press Start 2P',monospace; font-size:8px;
 }
-.farm-toggle:hover { background: rgba(0,0,0,0.7); }
+.farm-toggle:hover { background:rgba(0,0,0,0.7); }
 
-/* ===== 响应式 ===== */
-@media (max-width: 768px) {
-  .pixel-farm { height: 400px; }
-  .farm-hud { flex-direction: column; align-items: flex-start; }
-}
-
-/* ===== 星星（夜晚） ===== */
-.farm-star {
-  position: absolute;
-  width: 3px; height: 3px;
-  background: #fff;
-  opacity: 0;
-  transition: opacity 3s ease;
-}
-.farm-star.visible {
-  opacity: 0.8;
-  animation: starTwinkle 2s ease-in-out infinite;
-}
-@keyframes starTwinkle {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 0.9; }
+@media(max-width:768px) {
+  .pixel-farm { height:400px; }
+  .farm-hud { flex-direction:column; align-items:flex-start; }
 }
 </style>
 </head>
@@ -515,199 +273,164 @@
 <div id="navbar-container"></div>
 <div class="main-container">
 
-  <!-- HUD -->
-  <div class="farm-hud">
-    <div class="farm-hud-left">
-      <div class="hud-item"><i class="fas fa-microchip" style="color:#6366f1"></i> Agents: <span class="hud-val" id="hud-agents">0</span></div>
-      <div class="hud-sep"></div>
-      <div class="hud-item"><i class="fas fa-bolt" style="color:#10b981"></i> 工作中: <span class="hud-val" id="hud-working">0</span></div>
-      <div class="hud-sep"></div>
-      <div class="hud-item"><i class="fas fa-coffee" style="color:#f59e0b"></i> 摸鱼: <span class="hud-val" id="hud-idle">0</span></div>
-    </div>
-    <div class="farm-hud-right">
-      <div class="hud-item"><i class="fas fa-tachometer-alt" style="color:#a78bfa"></i> CPU: <span class="hud-val" id="hud-cpu">--</span></div>
-      <div class="hud-sep"></div>
-      <div class="hud-item"><i class="fas fa-memory" style="color:#06b6d4"></i> MEM: <span class="hud-val" id="hud-mem">--</span></div>
-      <div class="hud-sep"></div>
-      <div class="hud-item"><i class="fas fa-clock" style="color:var(--text-muted)"></i> <span id="hud-uptime">--</span></div>
-    </div>
+<!-- HUD -->
+<div class="farm-hud">
+  <div class="farm-hud-left">
+    <div class="hud-item"><i class="fas fa-microchip" style="color:#6366f1"></i> Agents: <span class="hud-val" id="hud-agents">0</span></div>
+    <div class="hud-sep"></div>
+    <div class="hud-item"><i class="fas fa-bolt" style="color:#10b981"></i> 工作中: <span class="hud-val" id="hud-working">0</span></div>
+    <div class="hud-sep"></div>
+    <div class="hud-item"><i class="fas fa-coffee" style="color:#f59e0b"></i> 摸鱼: <span class="hud-val" id="hud-idle">0</span></div>
   </div>
-
-  <!-- 像素农场场景 -->
-  <div class="pixel-farm" id="farmScene">
-    <!-- 天空 -->
-    <div class="farm-sky day" id="farmSky">
-      <div class="farm-sun" id="farmSun"></div>
-      <!-- 星星（夜晚显示） -->
-      <div class="farm-star" style="top:12%;left:10%"></div>
-      <div class="farm-star" style="top:8%;left:25%"></div>
-      <div class="farm-star" style="top:18%;left:40%"></div>
-      <div class="farm-star" style="top:5%;left:55%"></div>
-      <div class="farm-star" style="top:15%;left:70%"></div>
-      <div class="farm-star" style="top:10%;left:85%"></div>
-      <div class="farm-star" style="top:22%;left:15%"></div>
-      <div class="farm-star" style="top:7%;left:62%"></div>
-    </div>
-
-    <!-- 云朵 -->
-    <div class="farm-cloud" style="top:30px;left:10%;width:24px;height:16px;animation-duration:20s"></div>
-    <div class="farm-cloud" style="top:50px;left:55%;width:20px;height:14px;animation-duration:25s;animation-delay:-8s"></div>
-    <div class="farm-cloud" style="top:20px;left:75%;width:16px;height:12px;animation-duration:18s;animation-delay:-15s"></div>
-
-    <!-- 远山 -->
-    <div class="farm-mountains">
-      <div class="farm-mountain m1"></div>
-      <div class="farm-mountain m2"></div>
-      <div class="farm-mountain m3"></div>
-      <div class="farm-mountain m4"></div>
-    </div>
-
-    <!-- 地面 -->
-    <div class="farm-ground">
-      <div class="farm-grass"></div>
-      <div class="farm-dirt"></div>
-    </div>
-
-    <!-- 栅栏（左） -->
-    <div class="farm-fence" style="left:20px;">
-      <div class="fence-post"></div><div class="fence-post"></div><div class="fence-post"></div>
-      <div class="fence-post"></div><div class="fence-post"></div>
-    </div>
-    <!-- 栅栏（右） -->
-    <div class="farm-fence" style="right:20px;">
-      <div class="fence-post"></div><div class="fence-post"></div><div class="fence-post"></div>
-      <div class="fence-post"></div><div class="fence-post"></div>
-    </div>
-
-    <!-- 树 -->
-    <div class="farm-tree" style="left:80px;"><div class="tree-leaves"></div><div class="tree-trunk"></div></div>
-    <div class="farm-tree" style="right:100px;"><div class="tree-leaves"></div><div class="tree-trunk"></div></div>
-
-    <!-- 花朵 -->
-    <div class="farm-flower" style="left:160px;"><div class="flower-head" style="background:#FF6B6B"></div><div class="flower-stem"></div></div>
-    <div class="farm-flower" style="left:180px;"><div class="flower-head" style="background:#FFE66D"></div><div class="flower-stem"></div></div>
-    <div class="farm-flower" style="left:200px;"><div class="flower-head" style="background:#FF9F43"></div><div class="flower-stem"></div></div>
-    <div class="farm-flower" style="right:200px;"><div class="flower-head" style="background:#FF6B6B"></div><div class="flower-stem"></div></div>
-    <div class="farm-flower" style="right:220px;"><div class="flower-head" style="background:#A29BFE"></div><div class="flower-stem"></div></div>
-
-    <!-- 昼夜切换 -->
-    <button class="farm-toggle" id="dayNightToggle"><i class="fas fa-moon"></i> 昼夜</button>
+  <div class="farm-hud-right">
+    <div class="hud-item"><i class="fas fa-tachometer-alt" style="color:#a78bfa"></i> CPU: <span class="hud-val" id="hud-cpu">--</span></div>
+    <div class="hud-sep"></div>
+    <div class="hud-item"><i class="fas fa-memory" style="color:#06b6d4"></i> MEM: <span class="hud-val" id="hud-mem">--</span></div>
+    <div class="hud-sep"></div>
+    <div class="hud-item"><i class="fas fa-clock" style="color:var(--text-muted)"></i> <span id="hud-uptime">--</span></div>
   </div>
+</div>
 
-  <!-- 状态图例 -->
-  <div class="farm-legend">
-    <div class="legend-item"><div class="legend-dot working"></div> 工作中 - 在工位前疯狂敲代码</div>
-    <div class="legend-item"><div class="legend-dot idle"></div> 空闲 - 在农场里闲逛摸鱼</div>
-    <div class="legend-item"><div class="legend-dot offline"></div> 离线 - 躺平休眠</div>
+<!-- 像素农场场景 -->
+<div class="pixel-farm" id="farmScene">
+  <div class="farm-sky day" id="farmSky">
+    <div class="farm-sun" id="farmSun"></div>
+    <div class="farm-star" style="top:12%;left:10%"></div>
+    <div class="farm-star" style="top:8%;left:25%"></div>
+    <div class="farm-star" style="top:18%;left:40%"></div>
+    <div class="farm-star" style="top:5%;left:55%"></div>
+    <div class="farm-star" style="top:15%;left:70%"></div>
+    <div class="farm-star" style="top:10%;left:85%"></div>
+    <div class="farm-star" style="top:22%;left:15%"></div>
+    <div class="farm-star" style="top:7%;left:62%"></div>
   </div>
+  <div class="farm-cloud" style="top:30px;left:10%;width:24px;height:16px;animation-duration:20s"></div>
+  <div class="farm-cloud" style="top:50px;left:55%;width:20px;height:14px;animation-duration:25s;animation-delay:-8s"></div>
+  <div class="farm-cloud" style="top:20px;left:75%;width:16px;height:12px;animation-duration:18s;animation-delay:-15s"></div>
+  <div class="farm-mountains">
+    <div class="farm-mountain m1"></div>
+    <div class="farm-mountain m2"></div>
+    <div class="farm-mountain m3"></div>
+    <div class="farm-mountain m4"></div>
+  </div>
+  <div class="farm-ground">
+    <div class="farm-grass"></div>
+    <div class="farm-dirt"></div>
+  </div>
+  <div class="farm-fence" style="left:20px;">
+    <div class="fence-post"></div><div class="fence-post"></div><div class="fence-post"></div>
+    <div class="fence-post"></div><div class="fence-post"></div>
+  </div>
+  <div class="farm-fence" style="right:20px;">
+    <div class="fence-post"></div><div class="fence-post"></div><div class="fence-post"></div>
+    <div class="fence-post"></div><div class="fence-post"></div>
+  </div>
+  <div class="farm-tree" style="left:80px;"><div class="tree-leaves"></div><div class="tree-trunk"></div></div>
+  <div class="farm-tree" style="right:100px;"><div class="tree-leaves"></div><div class="tree-trunk"></div></div>
+  <div class="farm-flower" style="left:160px;"><div class="flower-head" style="background:#FF6B6B"></div><div class="flower-stem"></div></div>
+  <div class="farm-flower" style="left:180px;"><div class="flower-head" style="background:#FFE66D"></div><div class="flower-stem"></div></div>
+  <div class="farm-flower" style="left:200px;"><div class="flower-head" style="background:#FF9F43"></div><div class="flower-stem"></div></div>
+  <div class="farm-flower" style="right:200px;"><div class="flower-head" style="background:#FF6B6B"></div><div class="flower-stem"></div></div>
+  <div class="farm-flower" style="right:220px;"><div class="flower-head" style="background:#A29BFE"></div><div class="flower-stem"></div></div>
+  <button class="farm-toggle" id="dayNightToggle"><i class="fas fa-moon"></i> 昼夜</button>
+</div>
 
-  <!-- 详情面板 -->
-  <div class="farm-detail" id="farmDetail">
-    <h3><i class="fas fa-info-circle"></i> <span id="detailTitle">Agent Detail</span></h3>
-    <div class="detail-grid" id="detailGrid"></div>
-  </div>
+<!-- 状态图例 -->
+<div class="farm-legend">
+  <div class="legend-item"><div class="legend-dot working"></div> 工作中 — 在工位前疯狂敲代码</div>
+  <div class="legend-item"><div class="legend-dot idle"></div> 空闲 — 在农场里闲逛摸鱼</div>
+  <div class="legend-item"><div class="legend-dot offline"></div> 离线 — 躺平休眠</div>
+</div>
 
-  <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;color:var(--text-muted);font-size:11px;">
-    <span><i class="fas fa-gamepad"></i> 像素农场 v3.0 - Pixel Farm</span>
-    <span id="lastUpdate">--</span>
-  </div>
+<!-- 详情面板 -->
+<div class="farm-detail" id="farmDetail">
+  <h3><i class="fas fa-info-circle"></i> <span id="detailTitle">Agent Detail</span></h3>
+  <div class="detail-grid" id="detailGrid"></div>
+</div>
+
+<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;color:var(--text-muted);font-size:11px;">
+  <span><i class="fas fa-gamepad"></i> 像素农场 v3.0 — Pixel Farm</span>
+  <span id="lastUpdate">--</span>
+</div>
 </div>
 
 <script>
 var API_HOST = window.location.origin;
 
-// ===== 像素角色精灵 =====
-function makeSprite(id, status) {
-  var c = id === 'codex'
-    ? {s:'#06b6d4',p:'#0e7490',sk:'#fcd5b8',h:'#1a1a2e',sh:'#0c4a6e'}
-    : {s:'#6366f1',p:'#3730a3',sk:'#fcd5b8',h:'#5d4037',sh:'#1e1b4b'};
+// ===== 像素精灵生成 =====
+var COLORS = {
+  openclaw: { s:'#6366f1', p:'#3730a3', sk:'#fcd5b8', h:'#5d4037', sh:'#1e1b4b' },
+  codex:    { s:'#06b6d4', p:'#0e7490', sk:'#fcd5b8', h:'#1a1a2e', sh:'#0c4a6e' },
+};
 
-  if (status === 'online') {
-    // 工作：坐姿，手放键盘上
-    return '<svg width="40" height="48" viewBox="0 0 40 48">' +
-      // 腿
-      '<rect x="10" y="34" width="8" height="10" fill="'+c.p+'" rx="1"/>' +
-      '<rect x="22" y="34" width="8" height="10" fill="'+c.p+'" rx="1"/>' +
-      // 鞋
-      '<rect x="8" y="42" width="11" height="4" fill="'+c.sh+'" rx="1"/>' +
-      '<rect x="21" y="42" width="11" height="4" fill="'+c.sh+'" rx="1"/>' +
-      // 身体
-      '<rect x="8" y="20" width="24" height="16" fill="'+c.s+'" rx="2"/>' +
-      // 手臂（伸向键盘）
-      '<rect x="0" y="22" width="10" height="6" fill="'+c.sk+'" rx="1"/>' +
-      '<rect x="30" y="22" width="10" height="6" fill="'+c.sk+'" rx="1"/>' +
-      // 手
-      '<rect x="-2" y="25" width="6" height="4" fill="'+c.sk+'" rx="1"/>' +
-      '<rect x="34" y="25" width="6" height="4" fill="'+c.sk+'" rx="1"/>' +
-      // 头
-      '<rect x="10" y="6" width="20" height="16" fill="'+c.sk+'" rx="2"/>' +
-      // 头发
-      '<rect x="8" y="0" width="24" height="8" fill="'+c.h+'" rx="2"/>' +
-      '<rect x="8" y="8" width="4" height="6" fill="'+c.h+'"/>' +
-      '<rect x="28" y="8" width="4" height="6" fill="'+c.h+'"/>' +
-      // 眼睛（专注看屏幕）
-      '<rect x="13" y="12" width="4" height="3" fill="#1a1a2e" rx="1"/>' +
-      '<rect x="23" y="12" width="4" height="3" fill="#1a1a2e" rx="1"/>' +
-      // 嘴（认真）
-      '<rect x="16" y="17" width="8" height="2" fill="#c0392b" rx="1"/>' +
-      // 汗珠
-      '<rect x="32" y="4" width="3" height="5" fill="#85c1e9" rx="1" opacity="0.7"/>' +
-      '</svg>';
-  }
-
-  if (status === 'offline') {
-    // 离线：躺平
-    return '<svg width="40" height="48" viewBox="0 0 40 48">' +
-      // 身体（横躺）
-      '<rect x="2" y="30" width="36" height="12" fill="'+c.s+'" rx="3" opacity="0.5"/>' +
-      // 头（侧）
-      '<rect x="0" y="24" width="14" height="12" fill="'+c.sk+'" rx="2" opacity="0.6"/>' +
-      // 闭眼
-      '<rect x="2" y="30" width="5" height="2" fill="#1a1a2e" rx="1"/>' +
-      // 腿
-      '<rect x="30" y="34" width="8" height="8" fill="'+c.p+'" rx="1" opacity="0.4"/>' +
-      // ZZZ
-      '<rect x="24" y="14" width="5" height="5" fill="rgba(255,255,255,0.35)" rx="1"/>' +
-      '<rect x="32" y="6" width="4" height="4" fill="rgba(255,255,255,0.25)" rx="1"/>' +
-      '<rect x="36" y="0" width="3" height="3" fill="rgba(255,255,255,0.15)" rx="1"/>' +
-      '</svg>';
-  }
-
-  // 空闲：站立，悠闲
+function spriteWork(id) {
+  var c = COLORS[id] || COLORS.openclaw;
   return '<svg width="40" height="48" viewBox="0 0 40 48">' +
-    // 腿
-    '<rect x="12" y="34" width="7" height="10" fill="'+c.p+'" rx="1"/>' +
-    '<rect x="21" y="34" width="7" height="10" fill="'+c.p+'" rx="1"/>' +
-    // 鞋
-    '<rect x="10" y="42" width="10" height="4" fill="'+c.sh+'" rx="1"/>' +
-    '<rect x="20" y="42" width="10" height="4" fill="'+c.sh+'" rx="1"/>' +
-    // 身体
-    '<rect x="10" y="20" width="20" height="16" fill="'+c.s+'" rx="2"/>' +
-    // 手臂（叉腰/放松）
-    '<rect x="2" y="22" width="10" height="6" fill="'+c.sk+'" rx="1"/>' +
-    '<rect x="28" y="22" width="10" height="6" fill="'+c.sk+'" rx="1"/>' +
-    // 手
-    '<rect x="0" y="25" width="5" height="4" fill="'+c.sk+'" rx="1"/>' +
-    '<rect x="35" y="25" width="5" height="4" fill="'+c.sk+'" rx="1"/>' +
-    // 头
+    '<rect x="10" y="34" width="8" height="10" fill="'+c.p+'" rx="1"/>' +
+    '<rect x="22" y="34" width="8" height="10" fill="'+c.p+'" rx="1"/>' +
+    '<rect x="8" y="42" width="11" height="4" fill="'+c.sh+'" rx="1"/>' +
+    '<rect x="21" y="42" width="11" height="4" fill="'+c.sh+'" rx="1"/>' +
+    '<rect x="8" y="20" width="24" height="16" fill="'+c.s+'" rx="2"/>' +
+    '<rect x="0" y="22" width="10" height="6" fill="'+c.sk+'" rx="1"/>' +
+    '<rect x="30" y="22" width="10" height="6" fill="'+c.sk+'" rx="1"/>' +
+    '<rect x="-2" y="25" width="6" height="4" fill="'+c.sk+'" rx="1"/>' +
+    '<rect x="34" y="25" width="6" height="4" fill="'+c.sk+'" rx="1"/>' +
     '<rect x="10" y="6" width="20" height="16" fill="'+c.sk+'" rx="2"/>' +
-    // 头发
     '<rect x="8" y="0" width="24" height="8" fill="'+c.h+'" rx="2"/>' +
     '<rect x="8" y="8" width="4" height="6" fill="'+c.h+'"/>' +
     '<rect x="28" y="8" width="4" height="6" fill="'+c.h+'"/>' +
-    // 眼睛（半闭，悠闲）
+    '<rect x="13" y="12" width="4" height="3" fill="#1a1a2e" rx="1"/>' +
+    '<rect x="23" y="12" width="4" height="3" fill="#1a1a2e" rx="1"/>' +
+    '<rect x="16" y="17" width="8" height="2" fill="#c0392b" rx="1"/>' +
+    '<rect x="32" y="4" width="3" height="5" fill="#85c1e9" rx="1" opacity="0.7"/>' +
+    '</svg>';
+}
+
+function spriteIdle(id) {
+  var c = COLORS[id] || COLORS.openclaw;
+  return '<svg width="40" height="48" viewBox="0 0 40 48">' +
+    '<rect x="12" y="34" width="7" height="10" fill="'+c.p+'" rx="1"/>' +
+    '<rect x="21" y="34" width="7" height="10" fill="'+c.p+'" rx="1"/>' +
+    '<rect x="10" y="42" width="10" height="4" fill="'+c.sh+'" rx="1"/>' +
+    '<rect x="20" y="42" width="10" height="4" fill="'+c.sh+'" rx="1"/>' +
+    '<rect x="10" y="20" width="20" height="16" fill="'+c.s+'" rx="2"/>' +
+    '<rect x="2" y="22" width="10" height="6" fill="'+c.sk+'" rx="1"/>' +
+    '<rect x="28" y="22" width="10" height="6" fill="'+c.sk+'" rx="1"/>' +
+    '<rect x="0" y="25" width="5" height="4" fill="'+c.sk+'" rx="1"/>' +
+    '<rect x="35" y="25" width="5" height="4" fill="'+c.sk+'" rx="1"/>' +
+    '<rect x="10" y="6" width="20" height="16" fill="'+c.sk+'" rx="2"/>' +
+    '<rect x="8" y="0" width="24" height="8" fill="'+c.h+'" rx="2"/>' +
+    '<rect x="8" y="8" width="4" height="6" fill="'+c.h+'"/>' +
+    '<rect x="28" y="8" width="4" height="6" fill="'+c.h+'"/>' +
     '<rect x="13" y="12" width="5" height="2" fill="#1a1a2e" rx="1"/>' +
     '<rect x="22" y="12" width="5" height="2" fill="#1a1a2e" rx="1"/>' +
-    // 微笑
     '<rect x="15" y="17" width="10" height="2" fill="#e57373" rx="1"/>' +
     '</svg>';
 }
 
+function spriteOffline(id) {
+  var c = COLORS[id] || COLORS.openclaw;
+  return '<svg width="40" height="48" viewBox="0 0 40 48">' +
+    '<rect x="2" y="30" width="36" height="12" fill="'+c.s+'" rx="3" opacity="0.5"/>' +
+    '<rect x="0" y="24" width="14" height="12" fill="'+c.sk+'" rx="2" opacity="0.6"/>' +
+    '<rect x="2" y="30" width="5" height="2" fill="#1a1a2e" rx="1"/>' +
+    '<rect x="30" y="34" width="8" height="8" fill="'+c.p+'" rx="1" opacity="0.4"/>' +
+    '<rect x="24" y="14" width="5" height="5" fill="rgba(255,255,255,0.35)" rx="1"/>' +
+    '<rect x="32" y="6" width="4" height="4" fill="rgba(255,255,255,0.25)" rx="1"/>' +
+    '<rect x="36" y="0" width="3" height="3" fill="rgba(255,255,255,0.15)" rx="1"/>' +
+    '</svg>';
+}
+
+function getSprite(id, status) {
+  if (status === 'online')  return spriteWork(id);
+  if (status === 'offline') return spriteOffline(id);
+  return spriteIdle(id);
+}
+
 // ===== 工位 =====
-function makeDesk(x) {
+function buildDesk(x) {
   var el = document.createElement('div');
-  el.className = 'farm-desk';
-  el.style.left = x + 'px';
+  el.className = 'farm-desk'; el.style.left = x + 'px';
   el.innerHTML =
     '<div class="desk-chair"><div class="chair-back"></div><div class="chair-seat"></div></div>' +
     '<div class="desk-body"></div>' +
@@ -717,84 +440,164 @@ function makeDesk(x) {
 }
 
 // ===== 角色 =====
-function makeCharacter(id, info, status, x, y) {
+// 全局：缓存已创建的角色 DOM { agentId -> { el, status, wanderTimer } }
+var gChars = {};
+var gDesks = [];
+
+function buildCharacter(id, info, status) {
   var el = document.createElement('div');
   el.className = 'farm-character ' + status;
-  el.style.left = x + 'px';
-  el.style.bottom = y + 'px';
   el.dataset.agentId = id;
-
   var label = info.name || id;
   el.innerHTML =
-    '<div class="char-sprite"><div class="char-shadow"></div>' + makeSprite(id, status) + '</div>' +
+    '<div class="char-sprite"><div class="char-shadow"></div>' + getSprite(id, status) + '</div>' +
     '<div class="char-name-tag">' + label + '</div>';
-
-  el.addEventListener('click', function() { showDetail(id, info, status); });
+  el.addEventListener('click', function(){ showDetail(id, info, status); });
   return el;
 }
 
-// ===== 渲染 =====
-var deskPositions = [];
-var charPositions = {};
-
+// ===== 核心渲染：只创建/更新，不无意义重建 =====
 function renderFarm(agents) {
   var scene = document.getElementById('farmScene');
-  // 清理旧工位和角色
-  scene.querySelectorAll('.farm-desk, .farm-character').forEach(function(el){ el.remove(); });
-
   var ids = Object.keys(agents);
   var n = ids.length;
   if (n === 0) return;
 
   var W = scene.clientWidth || 800;
-  var charBottom = 14; // % from bottom
 
-  // 工位放在右下区域，均匀分布
-  var deskW = 64;
-  var gap = 40;
+  // 工位位置（右下区域均匀分布）
+  var deskW = 64, gap = 40;
   var totalW = n * deskW + (n - 1) * gap;
   var deskStartX = Math.max(20, W * 0.55);
-  var deskY = 52; // px from bottom
+  var deskY = 52;
 
-  deskPositions = [];
+  // 只在工位数量变化时重建工位
+  var oldDeskCount = scene.querySelectorAll('.farm-desk').length;
+  if (oldDeskCount !== n) {
+    scene.querySelectorAll('.farm-desk').forEach(function(el){ el.remove(); });
+    gDesks = [];
+    for (var i = 0; i < n; i++) {
+      var dx = deskStartX + i * (deskW + gap);
+      scene.appendChild(buildDesk(dx));
+      gDesks.push({ x: dx, y: deskY });
+    }
+  }
 
+  // 处理每个 agent
+  var activeIds = {};
   for (var i = 0; i < n; i++) {
     var aid = ids[i];
     var info = agents[aid];
     var status = info.status || 'offline';
+    activeIds[aid] = true;
 
-    var dx = deskStartX + i * (deskW + gap);
-    scene.appendChild(makeDesk(dx));
-    deskPositions.push({ id: aid, x: dx, y: deskY });
+    var ch = gChars[aid];
+    var desk = gDesks[i] || gDesks[0];
 
-    // 角色位置
-    var cx, cy;
+    // 计算目标位置
+    var targetX, targetY;
     if (status === 'online') {
-      // 站在工位前
-      cx = dx + deskW / 2 - 20;
-      cy = deskY + 30;
+      targetX = desk.x + deskW / 2 - 20;
+      targetY = deskY + 30;
     } else {
-      // 在农场上半部分自由活动
-      var hash = 0;
-      for (var ch = 0; ch < aid.length; ch++) hash += aid.charCodeAt(ch);
-      cx = 40 + (hash * 37) % (W - 120);
-      cy = 80 + (hash * 13) % 100;
+      // 空闲/离线：在农场上半部分
+      if (!ch || ch.lastStatus !== status) {
+        // 首次或状态变化：给一个随机位置
+        var hash = 0;
+        for (var ch2 = 0; ch2 < aid.length; ch2++) hash += aid.charCodeAt(ch2);
+        targetX = 40 + (hash * 37) % Math.max(80, W - 160);
+        targetY = 80 + (hash * 13) % 100;
+      } else {
+        targetX = ch.homeX;
+        targetY = ch.homeY;
+      }
     }
 
-    charPositions[aid] = { x: cx, y: cy };
-    scene.appendChild(makeCharacter(aid, info, status, cx, cy));
+    if (!ch) {
+      // 首次创建
+      ch = gChars[aid] = {
+        el: buildCharacter(aid, info, status),
+        status: status,
+        homeX: targetX,
+        homeY: targetY,
+        wanderTimer: null,
+        wanderTarget: null
+      };
+      scene.appendChild(ch.el);
+      // 初始位置（无动画）
+      ch.el.style.transition = 'none';
+      ch.el.style.left = targetX + 'px';
+      ch.el.style.bottom = targetY + 'px';
+      // 强制重绘后恢复过渡
+      ch.el.offsetHeight;
+      ch.el.style.transition = 'left 1.2s ease-in-out, bottom 1.2s ease-in-out';
+    } else {
+      // 已存在：检查状态是否变化
+      if (ch.status !== status) {
+        ch.status = status;
+        // 更新 CSS 类
+        ch.el.className = 'farm-character ' + status;
+        // 更新精灵
+        var spriteWrap = ch.el.querySelector('.char-sprite');
+        if (spriteWrap) {
+          spriteWrap.innerHTML = '<div class="char-shadow"></div>' + getSprite(aid, status);
+        }
+        // 停止旧的游走定时器
+        if (ch.wanderTimer) { clearInterval(ch.wanderTimer); ch.wanderTimer = null; }
+      }
+
+      // 移动到目标位置（CSS transition 自动平滑）
+      ch.homeX = targetX;
+      ch.homeY = targetY;
+      ch.el.style.left = targetX + 'px';
+      ch.el.style.bottom = targetY + 'px';
+
+      // 空闲状态：启动随机游走
+      if (status === 'idle' && !ch.wanderTimer) {
+        ch.wanderTimer = setInterval(function() {
+          var character = gChars[aid];
+          if (!character || character.status !== 'idle') {
+            clearInterval(character.wanderTimer);
+            character.wanderTimer = null;
+            return;
+          }
+          var newX = character.homeX + (Math.random() - 0.5) * 80;
+          var newY = character.homeY + (Math.random() - 0.5) * 40;
+          newX = Math.max(10, Math.min(W - 60, newX));
+          newY = Math.max(60, Math.min(180, newY));
+          character.el.style.left = newX + 'px';
+          character.el.style.bottom = newY + 'px';
+        }, 2500);
+      }
+
+      // 非空闲状态：停止游走
+      if (status !== 'idle' && ch.wanderTimer) {
+        clearInterval(ch.wanderTimer);
+        ch.wanderTimer = null;
+      }
+    }
+
+    ch.lastStatus = status;
+  }
+
+  // 移除不存在的 agent
+  for (var existingId in gChars) {
+    if (!activeIds[existingId]) {
+      var ch2 = gChars[existingId];
+      if (ch2.wanderTimer) clearInterval(ch2.wanderTimer);
+      if (ch2.el.parentNode) ch2.el.remove();
+      delete gChars[existingId];
+    }
   }
 }
 
-// ===== 详情 =====
+// ===== 详情面板 =====
 function showDetail(id, info, status) {
   var panel = document.getElementById('farmDetail');
   var title = document.getElementById('detailTitle');
   var grid = document.getElementById('detailGrid');
-
   var si = status === 'online' ? '[WORK]' : status === 'offline' ? '[OFF]' : '[IDLE]';
   title.textContent = si + ' ' + (info.name || id);
-
   var sc = status === 'online' ? 'g' : status === 'offline' ? 'r' : 'y';
   var st = status === 'online' ? '#10b981' : status === 'offline' ? '#ef4444' : '#f59e0b';
   var cpu = info.cpu_usage != null ? info.cpu_usage.toFixed(1) + '%' : '--';
@@ -807,7 +610,7 @@ function showDetail(id, info, status) {
   var stText = status === 'online' ? '疯狂敲代码' : status === 'offline' ? '离线休眠' : '摸鱼中';
 
   grid.innerHTML =
-    '<div class="detail-card"><div class="d-label"><span class="mi '+sc+'"><i class="fas fa-circle"></i></span> 状态</div><div class="d-val" style="color:'+st+'">'+stText+'</div></div>' +
+    '<div class="detail-card"><div class="d-label"><span class="mi '+sc+'"><i class="fas fa-circle"></i></div><div class="d-val" style="color:'+st+'">'+stText+'</div></div>' +
     '<div class="detail-card"><div class="d-label"><span class="mi b"><i class="fas fa-microchip"></i></span> CPU</div><div class="d-val">'+cpu+'</div></div>' +
     '<div class="detail-card"><div class="d-label"><span class="mi c"><i class="fas fa-memory"></i></span> 内存</div><div class="d-val">'+mem+'</div></div>' +
     '<div class="detail-card"><div class="d-label"><span class="mi y"><i class="fas fa-hdd"></i></span> 内存(MB)</div><div class="d-val">'+mmb+'</div></div>' +
@@ -815,18 +618,16 @@ function showDetail(id, info, status) {
     '<div class="detail-card"><div class="d-label"><span class="mi b"><i class="fas fa-network-wired"></i></span> 网络出</div><div class="d-val">'+no+'</div></div>' +
     '<div class="detail-card"><div class="d-label"><span class="mi c"><i class="fas fa-brain"></i></span> 模型</div><div class="d-val" style="font-size:12px">'+mdl+'</div></div>' +
     '<div class="detail-card"><div class="d-label"><span class="mi y"><i class="fas fa-phone-volume"></i></span> API调用</div><div class="d-val">'+ac+'</div></div>';
-
   panel.classList.add('active');
-  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  panel.scrollIntoView({ behavior:'smooth', block:'nearest' });
 }
 
 function fmtB(b) {
   if (b < 1024) return b + 'B';
-  if (b < 1024*1024) return (b/1024).toFixed(1) + 'KB';
-  if (b < 1024*1024*1024) return (b/(1024*1024)).toFixed(1) + 'MB';
-  return (b/(1024*1024*1024)).toFixed(1) + 'GB';
+  if (b < 1048576) return (b/1024).toFixed(1) + 'KB';
+  if (b < 1073741824) return (b/1048576).toFixed(1) + 'MB';
+  return (b/1073741824).toFixed(1) + 'GB';
 }
-
 function fmtU(s) {
   var d = Math.floor(s/86400), h = Math.floor((s%86400)/3600), m = Math.floor((s%3600)/60);
   if (d > 0) return d + 'd ' + h + 'h';
@@ -875,28 +676,26 @@ document.getElementById('dayNightToggle').addEventListener('click', function() {
   var sun = document.getElementById('farmSun');
   var stars = document.querySelectorAll('.farm-star');
   if (isDay) {
-    sky.classList.remove('night');
-    sky.classList.add('day');
+    sky.classList.remove('night'); sky.classList.add('day');
     sun.classList.remove('night');
     stars.forEach(function(s){ s.classList.remove('visible'); });
     this.innerHTML = '<i class="fas fa-moon"></i> 昼夜';
   } else {
-    sky.classList.remove('day');
-    sky.classList.add('night');
+    sky.classList.remove('day'); sky.classList.add('night');
     sun.classList.add('night');
     stars.forEach(function(s){ s.classList.add('visible'); });
     this.innerHTML = '<i class="fas fa-sun"></i> 昼夜';
   }
 });
 
-// ===== 点击空白关闭面板 =====
+// ===== 点击空白关闭详情 =====
 document.getElementById('farmScene').addEventListener('click', function(e) {
   if (e.target === this || e.target.classList.contains('farm-ground') || e.target.classList.contains('farm-grass') || e.target.classList.contains('farm-dirt') || e.target.classList.contains('farm-sky') || e.target.classList.contains('farm-mountains')) {
     document.getElementById('farmDetail').classList.remove('active');
   }
 });
 
-// ===== 初始化 =====
+// ===== 启动 =====
 fetchData();
 connectSSE();
 </script>
